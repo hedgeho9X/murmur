@@ -165,6 +165,8 @@ class SpeechRecorder(
                 Thread(
                         {
                             val buffer = ByteArray(3200)
+                            var frames = 0
+                            var peak = 0f
                             try {
                                 while (recording) {
                                     val n = recorder.read(buffer, 0, buffer.size)
@@ -178,7 +180,19 @@ class SpeechRecorder(
                                                     .toDouble() / 32768
                                             sum += sample * sample
                                         }
-                                        onLevel(sqrt(sum / (n / 2)).toFloat())
+                                        val level = sqrt(sum / (n / 2)).toFloat()
+                                        onLevel(level)
+                                        // 调试仅记录采集计数和音量，不记录音频、正文或密钥。
+                                        if (BuildConfig.DEBUG) {
+                                            peak = maxOf(peak, level)
+                                            if (++frames % 20 == 0) {
+                                                android.util.Log.d(
+                                                    "MurmurAudio",
+                                                    "frames=$frames peakRms=$peak",
+                                                )
+                                                peak = 0f
+                                            }
+                                        }
                                         forward(buffer.copyOf(n))
                                     } else if (n < 0 && recording) throw IllegalStateException()
                                 }

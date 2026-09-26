@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 data class UiState(
     val draft: Draft = Draft(),
     val editor: Boolean = false,
+    val editingMessage: DisplayMessage? = null,
+    val editingText: String = "",
     val recording: Boolean = false,
     val finalizing: Boolean = false,
     val busy: Boolean = false,
@@ -29,6 +31,8 @@ data class UiState(
     val page: String = "capture",
     val query: String = "",
     val imagesOnly: Boolean = false,
+    val tagSuggestions: List<cn.hedgeho9.murmur.api.models.TagSuggestion> = emptyList(),
+    val selectedTags: List<String> = emptyList(),
     val posts: List<Post> = emptyList(),
     val cursor: String? = null,
     val details: List<DisplayMessage> = emptyList(),
@@ -45,6 +49,7 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
     val state = mutable.asStateFlow()
     private var speech: SpeechRecorder? = null
     private var listJob: Job? = null
+    private var tagJob: Job? = null
     private var silentJob: Job? = null
     private var finishJob: Job? = null
 
@@ -73,12 +78,40 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
 
     /** 修改未发送正文，不改写任何服务端消息。 */
     fun edit(text: String) {
-        draft(state.value.draft.copy(text = text))
+        if (state.value.editingMessage != null) change { it.copy(editingText = text) }
+        else draft(state.value.draft.copy(text = text))
     }
 
     /** 打开或收起共用编辑弹层；收尾阶段不允许手动覆盖转写。 */
     fun editor(open: Boolean) {
-        change { it.copy(editor = open) }
+        change { it.copy(editor = open, editingMessage = null, editingText = "") }
+    }
+
+    /** 打开已发布用户笔记的文字编辑，不覆盖尚未发送的新草稿。 */
+    fun editPublished(message: DisplayMessage) {
+        if (message.role != "user" || state.value.busy) return
+        change { it.copy(editor = true, editingMessage = message, editingText = message.text) }
+    }
+
+    /** 直接保存正文覆盖，不创建消息历史；失败时保留编辑内容。 */
+    private fun savePublished() {
+        val current = state.value
+        val message = current.editingMessage ?: return
+        val postId = current.selected ?: return
+        if (current.busy) return
+        change { it.copy(busy = true) }
+        viewModelScope.launch {
+            try {
+                MurmurApi(current.base, current.token)
+                    .editMessage(postId, message.id, current.editingText)
+                change {
+                    it.copy(editor = false, editingMessage = null, editingText = "", busy = false)
+                }
+                open(postId)
+            } catch (_: Exception) {
+                change { it.copy(busy = false, error = "保存失败，修改仍保留在编辑框中") }
+            }
+        }
     }
 
     /** 清除已展示的操作错误。 */
@@ -199,6 +232,8 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
                 finalizing = false,
                 editor = false,
                 liveText = "",
+                level = 0f,
+                captionVisible = false,
                 speaking = false,
             )
         }
@@ -292,6 +327,10 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
 
     /** 上传附件并创建帖子或追加消息，失败保留 ID 和已完成上传供用户重试。 */
     fun send() {
+        if (state.value.editingMessage != null) {
+            savePublished()
+            return
+        }
         val d = state.value.draft
         if (state.value.busy || state.value.finalizing || d.text.isBlank() && d.images.isEmpty())
             return
@@ -322,6 +361,35 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
     /** 更新列表查询文本，点击搜索后发起请求。 */
     fun query(text: String) {
         change { it.copy(query = text) }
+        if (text.startsWith("#")) suggestTags(text.drop(1))
+        else {
+            tagJob?.cancel()
+            change { it.copy(tagSuggestions = emptyList()) }
+        }
+    }
+
+    /** 防抖获取真实已有标签，取消旧请求避免补全结果串线。 */
+    fun suggestTags(prefix: String) {
+        tagJob?.cancel()
+        tagJob =
+            viewModelScope.launch {
+                delay(180)
+                try {
+                    val result = MurmurApi(state.value.base, state.value.token).suggestTags(prefix)
+                    change { it.copy(tagSuggestions = result) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    change { it.copy(tagSuggestions = emptyList()) }
+                }
+            }
+    }
+
+    /** 把标签补全项作为精确搜索条件，关闭候选列表。 */
+    fun searchTag(tag: String) {
+        tagJob?.cancel()
+        change { it.copy(query = "#" + tag, tagSuggestions = emptyList()) }
+        history()
     }
 
     /** 切换照片筛选并重新读取第一页。 */
@@ -366,8 +434,10 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
         change { it.copy(page = "detail", selected = id, busy = true) }
         viewModelScope.launch {
             try {
-                val rows = MurmurApi(state.value.base, state.value.token).detail(id)
-                change { it.copy(details = rows, busy = false) }
+                val api = MurmurApi(state.value.base, state.value.token)
+                val rows = api.detail(id)
+                val post = api.post(id)
+                change { it.copy(details = rows, selectedTags = post.tags, busy = false) }
             } catch (_: Exception) {
                 change { it.copy(busy = false, error = "帖子读取失败") }
             }

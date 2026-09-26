@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -40,11 +41,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -55,8 +58,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.mikepenz.markdown.m3.Markdown
 import java.io.File
-import kotlin.math.sin
 import kotlinx.coroutines.delay
 
 private val Green = Color(0xFF35B981)
@@ -73,6 +76,12 @@ class MainActivity : ComponentActivity() {
                         primary = Green,
                         background = Color.White,
                         surface = Color.White,
+                        onSurface = Color(0xFF292929),
+                        secondary = Color(0xFF525252),
+                        secondaryContainer = Color(0xFFF2F2F2),
+                        onSecondaryContainer = Color(0xFF292929),
+                        surfaceVariant = Color(0xFFF6F6F6),
+                        outline = Color(0xFFD8D8D8),
                     )
             ) {
                 MurmurScreen()
@@ -88,6 +97,8 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
     val s by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
+    val view = LocalView.current
+    val photoDrag = remember { PhotoDragState() }
     var preview by remember { mutableStateOf<Any?>(null) }
     var settings by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -189,19 +200,23 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                     ) {
                         Spacer(Modifier.weight(.35f))
                         Crossfade(s.recording, label = "capture") { recording ->
-                            if (recording)
-                                RecordingArea(s.liveText, s.speaking, s.captionVisible, s.level)
+                            if (recording) RecordingArea(s.liveText, s.captionVisible, s.level)
                             else
                                 Box(
                                     Modifier.fillMaxWidth()
                                         .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(22.dp))
-                                        .background(Color(0xFFF1F2F3)),
+                                        .then(
+                                            if (s.draft.images.isEmpty())
+                                                Modifier.clip(RoundedCornerShape(22.dp))
+                                                    .background(Color(0xFFF1F2F3))
+                                            else Modifier
+                                        ),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     if (s.draft.images.isNotEmpty())
                                         DraggablePhoto(
                                             s.draft.images.first(),
+                                            photoDrag,
                                             { preview = File(s.draft.images.first()) },
                                             { vm.removePhoto(s.draft.images.first()) },
                                         )
@@ -230,7 +245,7 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                         }
                                 }
                         }
-                        Spacer(Modifier.height(44.dp))
+                        Spacer(Modifier.weight(.5f))
                         if (s.recording)
                             RoundButton("停止录音", { vm.stop() }) {
                                 Box(
@@ -240,7 +255,12 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                 )
                             }
                         else if (s.draft.images.isNotEmpty())
-                            Row(horizontalArrangement = Arrangement.spacedBy(36.dp)) {
+                            Row(
+                                Modifier.graphicsLayer {
+                                    alpha = if (photoDrag.path == null) 1f else 0f
+                                },
+                                horizontalArrangement = Arrangement.spacedBy(36.dp),
+                            ) {
                                 RoundButton("开始录音", record) {
                                     Box(Modifier.size(26.dp).background(Red, CircleShape))
                                 }
@@ -251,6 +271,7 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                         else
                             Box(
                                 Modifier.size(76.dp)
+                                    .semantics { contentDescription = "拍照，长按录音" }
                                     .border(2.dp, Color.DarkGray, CircleShape)
                                     .padding(7.dp)
                                     .background(Color.DarkGray, CircleShape)
@@ -277,6 +298,11 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                                                 result:
                                                                     ImageCapture.OutputFileResults
                                                             ) {
+                                                                view.performHapticFeedback(
+                                                                    android.view
+                                                                        .HapticFeedbackConstants
+                                                                        .CONFIRM
+                                                                )
                                                                 vm.addPhoto(Uri.fromFile(file))
                                                             }
 
@@ -292,11 +318,15 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                         )
                                     }
                             )
-                        Spacer(Modifier.weight(.65f))
+                        Spacer(Modifier.height(24.dp))
                     }
                 "history" ->
                     LazyColumn(
-                        Modifier.padding(padding).fillMaxSize().padding(horizontal = 24.dp)
+                        Modifier.padding(padding)
+                            .fillMaxSize()
+                            .background(Color(0xFFF7F7F7))
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         item {
                             OutlinedTextField(
@@ -311,6 +341,8 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                     }
                                 },
                             )
+                            if (s.query.startsWith("#"))
+                                TagSuggestions(s.tagSuggestions, vm::searchTag)
                             FilterChip(
                                 selected = s.imagesOnly,
                                 onClick = { vm.filterImages(!s.imagesOnly) },
@@ -320,25 +352,32 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                         items(s.posts, key = { it.id.toString() }) { post ->
                             Column(
                                 Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color.White)
                                     .clickable { vm.open(post.id.toString()) }
-                                    .padding(vertical = 22.dp)
+                                    .padding(16.dp)
                             ) {
                                 Text(
-                                    post.createdAt.take(16).replace('T', ' '),
+                                    java.time.Instant.parse(post.createdAt)
+                                        .atZone(java.time.ZoneId.systemDefault())
+                                        .format(
+                                            java.time.format.DateTimeFormatter.ofPattern(
+                                                "yyyy-MM-dd HH:mm"
+                                            )
+                                        ),
                                     color = Color.Gray,
                                     fontSize = 12.sp,
                                 )
+                                TagRow(post.tags, vm::searchTag)
                                 Spacer(Modifier.height(8.dp))
-                                Text(
+                                Markdown(
                                     post.title
                                         ?: post.preview?.takeIf { it.isNotBlank() }
                                         ?: "照片记录",
-                                    fontSize = 18.sp,
-                                    maxLines = 3,
-                                )
-                                HorizontalDivider(
-                                    Modifier.padding(top = 20.dp),
-                                    color = Color(0xFFEEEEEE),
+                                    modifier =
+                                        Modifier.fillMaxWidth()
+                                            .heightIn(max = 112.dp)
+                                            .clipToBounds(),
                                 )
                             }
                         }
@@ -358,15 +397,23 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                 "detail" ->
                     Column(Modifier.padding(padding).fillMaxSize()) {
                         LazyColumn(Modifier.weight(1f).padding(horizontal = 24.dp)) {
+                            item { TagRow(s.selectedTags, vm::searchTag) }
                             items(s.details) { message ->
                                 var expanded by remember { mutableStateOf(false) }
-                                Column(Modifier.fillMaxWidth().padding(vertical = 18.dp)) {
+                                Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                                    if (message.role == "user")
+                                        IconButton(
+                                            onClick = { vm.editPublished(message) },
+                                            modifier = Modifier.align(Alignment.End),
+                                        ) {
+                                            Icon(Icons.Outlined.Edit, "编辑笔记")
+                                        }
+
                                     if (message.process)
                                         TextButton(onClick = { expanded = !expanded }) {
                                             Text(if (expanded) "收起执行过程" else "查看执行过程")
                                         }
-                                    if (!message.process || expanded)
-                                        Text(message.text, fontSize = 17.sp, lineHeight = 29.sp)
+                                    if (!message.process || expanded) Markdown(message.text)
                                     LazyRow {
                                         items(message.images) { url ->
                                             AsyncImage(
@@ -400,6 +447,26 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
             }
         }
         if (s.editor) {
+            val editorText = if (s.editingMessage != null) s.editingText else s.draft.text
+            var field by remember {
+                mutableStateOf(TextFieldValue(editorText, TextRange(editorText.length)))
+            }
+            LaunchedEffect(editorText) {
+                if (field.text != editorText)
+                    field = TextFieldValue(editorText, TextRange(editorText.length))
+            }
+            val format: (String, String) -> Unit = { before, after ->
+                val start = field.selection.min
+                val end = field.selection.max
+                val value =
+                    field.text.take(start) +
+                        before +
+                        field.text.substring(start, end) +
+                        after +
+                        field.text.drop(end)
+                field = TextFieldValue(value, TextRange(start + before.length, end + before.length))
+                vm.edit(value)
+            }
             val keyboard = LocalSoftwareKeyboardController.current
             BackHandler {
                 if (!s.busy && !s.finalizing) {
@@ -445,50 +512,69 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                     ) {}
                     .padding(22.dp)
             ) {
-                LazyRow {
-                    items(s.draft.images) { path ->
-                        Box(Modifier.padding(end = 10.dp).size(68.dp)) {
+                if (s.editingMessage != null)
+                    LazyRow {
+                        items(s.editingMessage?.images.orEmpty()) { url ->
                             AsyncImage(
-                                File(path),
+                                url,
                                 "附件",
-                                Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)).clickable {
-                                    preview = File(path)
-                                },
+                                Modifier.padding(end = 8.dp)
+                                    .size(68.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { preview = url },
                                 contentScale = ContentScale.Crop,
                             )
-                            Box(
-                                Modifier.align(Alignment.TopEnd).size(32.dp).clickable(
-                                    enabled = !s.busy
-                                ) {
-                                    vm.removePhoto(path)
-                                },
-                                contentAlignment = Alignment.TopEnd,
-                            ) {
+                        }
+                    }
+                else
+                    LazyRow {
+                        items(s.draft.images) { path ->
+                            Box(Modifier.padding(end = 10.dp).size(68.dp)) {
+                                AsyncImage(
+                                    File(path),
+                                    "附件",
+                                    Modifier.fillMaxSize()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { preview = File(path) },
+                                    contentScale = ContentScale.Crop,
+                                )
                                 Box(
-                                    Modifier.size(16.dp).background(Color.DarkGray, CircleShape),
-                                    contentAlignment = Alignment.Center,
+                                    Modifier.align(Alignment.TopEnd).size(32.dp).clickable(
+                                        enabled = !s.busy
+                                    ) {
+                                        vm.removePhoto(path)
+                                    },
+                                    contentAlignment = Alignment.TopEnd,
                                 ) {
-                                    Icon(
-                                        Icons.Outlined.Close,
-                                        "移除附件",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(11.dp),
-                                    )
+                                    Box(
+                                        Modifier.size(16.dp)
+                                            .background(Color.DarkGray, CircleShape),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.Close,
+                                            "移除附件",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(11.dp),
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
                 Box(
                     Modifier.fillMaxWidth()
                         .heightIn(min = 160.dp, max = 280.dp)
                         .padding(top = 14.dp)
                 ) {
-                    if (s.draft.text.isEmpty())
+                    if (editorText.isEmpty())
                         Text("现在的想法是…", color = Color.LightGray, fontSize = 18.sp)
                     BasicTextField(
-                        s.draft.text,
-                        vm::edit,
+                        field,
+                        {
+                            field = it
+                            vm.edit(it.text)
+                        },
                         enabled = !s.finalizing && !s.busy,
                         textStyle =
                             TextStyle(fontSize = 18.sp, lineHeight = 30.sp, color = Color.DarkGray),
@@ -497,9 +583,34 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                     )
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { format("#", "") }, enabled = !s.busy && !s.finalizing) {
+                        Text("#", fontSize = 26.sp)
+                    }
+                    IconButton(
+                        onClick = { format("**", "**") },
+                        enabled = !s.busy && !s.finalizing,
+                    ) {
+                        Icon(Icons.Outlined.FormatBold, "加粗")
+                    }
+                    IconButton(
+                        onClick = {
+                            format(
+                                if (
+                                    field.selection.min == 0 ||
+                                        field.text.getOrNull(field.selection.min - 1) == '\n'
+                                )
+                                    "- "
+                                else "\n- ",
+                                "",
+                            )
+                        },
+                        enabled = !s.busy && !s.finalizing,
+                    ) {
+                        Icon(Icons.Outlined.FormatListBulleted, "列表")
+                    }
                     IconButton(
                         onClick = { gallery.launch("image/*") },
-                        enabled = !s.busy && !s.finalizing,
+                        enabled = !s.busy && !s.finalizing && s.editingMessage == null,
                     ) {
                         Icon(Icons.Outlined.Image, "添加图片")
                     }
@@ -511,18 +622,24 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                             onClick = { vm.send() },
                             enabled =
                                 !s.finalizing &&
-                                    (s.draft.text.isNotBlank() || s.draft.images.isNotEmpty()),
+                                    (editorText.isNotBlank() ||
+                                        (s.editingMessage?.images ?: s.draft.images).isNotEmpty()),
                             colors =
                                 IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = Color(0xFFE5F7EF),
                                     contentColor = Green,
                                 ),
                         ) {
-                            Icon(Icons.Outlined.ArrowUpward, "发送")
+                            Icon(
+                                if (s.editingMessage != null) Icons.Outlined.Check
+                                else Icons.Outlined.ArrowUpward,
+                                if (s.editingMessage != null) "保存修改" else "保存笔记",
+                            )
                         }
                 }
             }
         }
+        PhotoDragOverlay(photoDrag)
         if (settings) {
             var url by remember { mutableStateOf(s.base) }
             var token by remember { mutableStateOf(s.token) }
@@ -590,56 +707,5 @@ private fun RoundButton(label: String, click: () -> Unit, content: @Composable (
         shape = CircleShape,
     ) {
         content()
-    }
-}
-
-/** 根据真实音量显示居中波形，静音留白；文字按可用宽度保留单行尾部。 */
-@Composable
-private fun RecordingArea(text: String, speaking: Boolean, captionVisible: Boolean, level: Float) {
-    BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(1f)) {
-        val measurer = rememberTextMeasurer()
-        val density = LocalDensity.current
-        val width = with(density) { (maxWidth - 24.dp).roundToPx() }
-        val style = TextStyle(fontSize = 20.sp)
-        val tail =
-            remember(text, width) {
-                var chars = text.toList()
-                while (
-                    chars.isNotEmpty() &&
-                        measurer.measure(chars.joinToString(""), style = style).size.width > width
-                ) chars = chars.drop(1)
-                chars.joinToString("")
-            }
-        if (speaking) {
-            Canvas(Modifier.align(Alignment.Center).fillMaxWidth().height(60.dp)) {
-                val spacing = size.width / 44
-                for (i in 0..39) {
-                    val h =
-                        (6 + level.coerceAtMost(.4f) * 140 * kotlin.math.abs(sin(i * .7)))
-                            .toFloat() * density.density
-                    drawLine(
-                        Green,
-                        androidx.compose.ui.geometry.Offset(
-                            spacing * (i + 2),
-                            size.height / 2 - h / 2,
-                        ),
-                        androidx.compose.ui.geometry.Offset(
-                            spacing * (i + 2),
-                            size.height / 2 + h / 2,
-                        ),
-                        strokeWidth = 3 * density.density,
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                    )
-                }
-            }
-        }
-        if (captionVisible) {
-            Text(
-                tail,
-                style = style,
-                maxLines = 1,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
-            )
-        }
     }
 }

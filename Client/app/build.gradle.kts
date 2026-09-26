@@ -34,6 +34,8 @@ android {
 
 dependencies {
     implementation(project(":api"))
+    implementation("com.mikepenz:multiplatform-markdown-renderer:0.37.0")
+    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.37.0")
     implementation("androidx.exifinterface:exifinterface:1.4.1")
     implementation(platform("androidx.compose:compose-bom:2025.09.01"))
     implementation("androidx.compose.material3:material3")

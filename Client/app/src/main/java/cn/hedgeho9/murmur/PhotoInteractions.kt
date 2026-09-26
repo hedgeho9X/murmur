@@ -1,8 +1,10 @@
 /** 草稿照片的预览与拖拽删除，不自动修改已发送记录。 */
 package cn.hedgeho9.murmur
 
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -25,81 +27,133 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import java.io.File
+import kotlin.math.roundToInt
 
-/** 点击查看照片；拖动时缩小照片并显示垃圾桶，释放点落入目标区域才删除并震动。 */
+/** 根布局共享拖动坐标，使缩小的照片与垃圾桶不受取景框裁切。 */
+@Stable
+class PhotoDragState {
+    var path by mutableStateOf<String?>(null)
+    var bounds by mutableStateOf(Rect.Zero)
+    var offset by mutableStateOf(Offset.Zero)
+    var pointer by mutableStateOf(Offset.Zero)
+    var trash by mutableStateOf(Rect.Zero)
+    val inside: Boolean
+        get() = path != null && trash.contains(pointer)
+}
+
+/** 长按开始拖动；只在进入垃圾桶时反馈一次，释放在目标内才删除。 */
 @Composable
-fun DraggablePhoto(path: String, onPreview: () -> Unit, onDelete: () -> Unit) {
+fun DraggablePhoto(
+    path: String,
+    drag: PhotoDragState,
+    onPreview: () -> Unit,
+    onDelete: () -> Unit,
+) {
     val haptic = LocalHapticFeedback.current
-    var dragging by remember(path) { mutableStateOf(false) }
-    var offset by remember(path) { mutableStateOf(Offset.Zero) }
-    var pointer by remember(path) { mutableStateOf(Offset.Zero) }
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    var trash by remember { mutableStateOf(Rect.Zero) }
-    val inside = dragging && trash.contains(pointer)
+    val context = LocalContext.current
+    val delete by rememberUpdatedState(onDelete)
+    var bounds by remember { mutableStateOf(Rect.Zero) }
     Box(
         Modifier.fillMaxSize()
-            .onGloballyPositioned { origin = it.boundsInRoot().topLeft }
+            .onGloballyPositioned { bounds = it.boundsInRoot() }
             .pointerInput(path) {
-                detectDragGestures(
+                detectDragGesturesAfterLongPress(
                     onDragStart = {
-                        dragging = true
-                        pointer = origin + it
+                        drag.bounds = bounds
+                        drag.pointer = bounds.topLeft + it
+                        drag.offset = Offset.Zero
+                        drag.path = path
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     },
-                    onDragCancel = {
-                        dragging = false
-                        offset = Offset.Zero
-                    },
+                    onDragCancel = { drag.path = null },
                     onDragEnd = {
-                        if (trash.contains(pointer)) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onDelete()
+                        if (drag.inside) {
+                            @Suppress("DEPRECATION")
+                            val vibrator =
+                                context.getSystemService(android.content.Context.VIBRATOR_SERVICE)
+                                    as Vibrator
+                            vibrator.vibrate(
+                                VibrationEffect.createWaveform(
+                                    longArrayOf(0, 12, 45, 12, 45, 18),
+                                    -1,
+                                )
+                            )
+                            delete()
                         }
-                        dragging = false
-                        offset = Offset.Zero
+                        drag.path = null
                     },
                 ) { change, amount ->
                     change.consume()
-                    offset += amount
-                    pointer = origin + change.position
+                    val wasInside = drag.inside
+                    drag.offset += amount
+                    drag.pointer = bounds.topLeft + change.position
+                    if (!wasInside && drag.inside)
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
             }
     ) {
+        if (drag.path == null)
+            AsyncImage(
+                File(path),
+                "草稿照片，长按拖动删除",
+                Modifier.fillMaxSize()
+                    .clip(RoundedCornerShape(22.dp))
+                    .clickable(onClick = onPreview),
+                contentScale = ContentScale.Crop,
+            )
+    }
+}
+
+/** 根窗口浮层显示无外框的缩小照片，垃圾桶固定在导航栏上方。 */
+@Composable
+fun BoxScope.PhotoDragOverlay(drag: PhotoDragState) {
+    val density = LocalDensity.current
+    drag.path?.let { path ->
         AsyncImage(
             File(path),
-            "草稿照片，拖到垃圾桶删除",
-            Modifier.fillMaxSize()
-                .graphicsLayer {
-                    translationX = offset.x
-                    translationY = offset.y
-                    scaleX = if (dragging) .72f else 1f
-                    scaleY = scaleX
-                    alpha = if (inside) .5f else 1f
+            "拖动中的照片",
+            Modifier.offset {
+                    IntOffset(
+                        (drag.bounds.left + drag.offset.x).roundToInt(),
+                        (drag.bounds.top + drag.offset.y).roundToInt(),
+                    )
                 }
-                .clip(RoundedCornerShape(22.dp))
-                .clickable(onClick = onPreview),
+                .size(
+                    with(density) { drag.bounds.width.toDp() },
+                    with(density) { drag.bounds.height.toDp() },
+                )
+                .graphicsLayer {
+                    scaleX = .64f
+                    scaleY = .64f
+                    alpha = if (drag.inside) .5f else 1f
+                }
+                .clip(RoundedCornerShape(18.dp)),
             contentScale = ContentScale.Crop,
         )
-        if (dragging)
-            Box(
-                Modifier.align(Alignment.BottomCenter)
-                    .padding(bottom = 6.dp)
-                    .size(64.dp)
-                    .onGloballyPositioned { trash = it.boundsInRoot() }
-                    .background(if (inside) Color(0xFFE65C55) else Color(0xFFF2F2F2), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Outlined.Delete,
-                    "拖到这里删除",
-                    tint = if (inside) Color.White else Color.Gray,
-                )
-            }
+        Box(
+            Modifier.align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 12.dp)
+                .size(64.dp)
+                .onGloballyPositioned { drag.trash = it.boundsInRoot() }
+                .background(if (drag.inside) Color(0xFFE65C55) else Color(0xFFF2F2F2), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.Delete,
+                "拖到这里删除",
+                tint = if (drag.inside) Color.White else Color.Gray,
+            )
+        }
     }
 }
 

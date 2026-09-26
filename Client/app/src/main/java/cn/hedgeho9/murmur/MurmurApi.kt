@@ -19,6 +19,7 @@ import retrofit2.Response
 
 /** 可展示消息，不包含原始供应商内部状态。 */
 data class DisplayMessage(
+    val id: String,
     val role: String,
     val text: String,
     val images: List<String>,
@@ -88,7 +89,10 @@ class MurmurApi(base: String, token: String) {
             }
         val content = UserContent(parts)
         if (draft.postId == null) {
-            val response = posts.createPost(CreatePostRequest(UUID.fromString(draft.id), content))
+            val response =
+                posts.createPost(
+                    CreatePostRequest(id = UUID.fromString(draft.id), content = content)
+                )
             if (response.code() == 409) {
                 posts.getPost(UUID.fromString(draft.id)).value()
                 return draft.id
@@ -98,7 +102,7 @@ class MurmurApi(base: String, token: String) {
         val response =
             posts.appendMessage(
                 UUID.fromString(draft.postId),
-                AppendMessageRequest(UUID.fromString(draft.id), content),
+                AppendMessageRequest(id = UUID.fromString(draft.id), content = content),
             )
         if (response.code() == 409) {
             val detail = posts.getPost(UUID.fromString(draft.postId)).value()
@@ -143,6 +147,7 @@ class MurmurApi(base: String, token: String) {
                     }
                 }
             DisplayMessage(
+                item.getValue("id").jsonPrimitive.content,
                 role,
                 text,
                 imageUrls,
@@ -150,6 +155,17 @@ class MurmurApi(base: String, token: String) {
                     parts.any { it.jsonObject["type"]?.jsonPrimitive?.content == "tool_call" },
             )
         }
+    }
+
+    /** 覆盖已发布用户笔记的文字，图片保持不变，标签由服务端重新提取。 */
+    suspend fun editMessage(postId: String, messageId: String, text: String) {
+        posts
+            .editMessage(
+                UUID.fromString(postId),
+                UUID.fromString(messageId),
+                EditMessageRequest(text),
+            )
+            .value()
     }
 
     /** 分页获取帖子列表，调用方决定何时加载下一页。 */
@@ -166,6 +182,13 @@ class MurmurApi(base: String, token: String) {
                 if (imagesOnly) PostsApi.ImagesOnlyListPosts.`true` else null,
             )
             .value()
+
+    /** 获取标签补全，返回由 OpenAPI 生成的 DTO。 */
+    suspend fun suggestTags(prefix: String): List<TagSuggestion> =
+        posts.suggestTags(prefix).value().items
+
+    /** 读取帖子元数据及服务端从正文派生的标签。 */
+    suspend fun post(id: String): Post = posts.getPost(UUID.fromString(id)).value().post
 
     /** 删除帖子及附件关系；对象删除由后端异步重试。 */
     suspend fun delete(id: String) {
