@@ -9,6 +9,9 @@ import cn.hedgeho9.murmur.api.models.*
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -25,6 +28,9 @@ data class DisplayMessage(
     val images: List<String>,
     val process: Boolean = false,
 )
+
+/** 同一次详情响应里的帖子与消息，避免重复读取产生不一致快照。 */
+data class DisplayPost(val post: Post, val messages: List<DisplayMessage>)
 
 /** 接口仓储负责生成 DTO、上传字节和错误归因；重试由草稿保存的 ID 决定。 */
 class MurmurApi(base: String, token: String) {
@@ -116,46 +122,59 @@ class MurmurApi(base: String, token: String) {
     }
 
     /** 解析消息正文与图片，工具过程归为可折叠内容，不改写持久化消息。 */
-    suspend fun detail(id: String): List<DisplayMessage> {
-        val detail = posts.getPost(UUID.fromString(id)).value()
-        return detail.messages.map { message ->
-            val item = codec.encodeToJsonElement(message).jsonObject
-            val role = item.getValue("role").jsonPrimitive.content
-            val parts = item.getValue("content").jsonObject.getValue("parts").jsonArray
-            val imageUrls =
-                parts
-                    .filter { it.jsonObject["type"]?.jsonPrimitive?.content == "image" }
-                    .map {
-                        images
-                            .getImageUrl(
-                                UUID.fromString(
-                                    it.jsonObject.getValue("image_id").jsonPrimitive.content
-                                )
-                            )
-                            .value()
-                            .url
-                            .toString()
+    suspend fun detail(id: String): DisplayPost =
+        withContext(Dispatchers.Default) {
+            val detail = posts.getPost(UUID.fromString(id)).value()
+            val rows =
+                detail.messages.map { message ->
+                    val item = codec.encodeToJsonElement(message).jsonObject
+                    val role = item.getValue("role").jsonPrimitive.content
+                    val parts = item.getValue("content").jsonObject.getValue("parts").jsonArray
+                    val imageUrls = coroutineScope {
+                        parts
+                            .filter { it.jsonObject["type"]?.jsonPrimitive?.content == "image" }
+                            .map { part ->
+                                async {
+                                    images
+                                        .getImageUrl(
+                                            UUID.fromString(
+                                                part.jsonObject
+                                                    .getValue("image_id")
+                                                    .jsonPrimitive
+                                                    .content
+                                            )
+                                        )
+                                        .value()
+                                        .url
+                                        .toString()
+                                }
+                            }
+                            .awaitAll()
                     }
-            val text =
-                parts.joinToString("\n") {
-                    val p = it.jsonObject
-                    when (p["type"]?.jsonPrimitive?.content) {
-                        "text" -> p["text"]?.jsonPrimitive?.content.orEmpty()
-                        "tool_call" -> "${p["name"]?.jsonPrimitive?.content} ${p["arguments"]}"
-                        "json" -> p["data"].toString()
-                        else -> ""
-                    }
+                    val text =
+                        parts.joinToString("\n") {
+                            val p = it.jsonObject
+                            when (p["type"]?.jsonPrimitive?.content) {
+                                "text" -> p["text"]?.jsonPrimitive?.content.orEmpty()
+                                "tool_call" ->
+                                    "${p["name"]?.jsonPrimitive?.content} ${p["arguments"]}"
+                                "json" -> p["data"].toString()
+                                else -> ""
+                            }
+                        }
+                    DisplayMessage(
+                        item.getValue("id").jsonPrimitive.content,
+                        role,
+                        text,
+                        imageUrls,
+                        role == "tool" ||
+                            parts.any {
+                                it.jsonObject["type"]?.jsonPrimitive?.content == "tool_call"
+                            },
+                    )
                 }
-            DisplayMessage(
-                item.getValue("id").jsonPrimitive.content,
-                role,
-                text,
-                imageUrls,
-                role == "tool" ||
-                    parts.any { it.jsonObject["type"]?.jsonPrimitive?.content == "tool_call" },
-            )
+            DisplayPost(detail.post, rows)
         }
-    }
 
     /** 覆盖已发布用户笔记的文字，图片保持不变，标签由服务端重新提取。 */
     suspend fun editMessage(postId: String, messageId: String, text: String) {
@@ -169,26 +188,12 @@ class MurmurApi(base: String, token: String) {
     }
 
     /** 分页获取帖子列表，调用方决定何时加载下一页。 */
-    suspend fun list(
-        cursor: String? = null,
-        query: String = "",
-        imagesOnly: Boolean = false,
-    ): PostPage =
-        posts
-            .listPosts(
-                20,
-                cursor,
-                query.ifBlank { null },
-                if (imagesOnly) PostsApi.ImagesOnlyListPosts.`true` else null,
-            )
-            .value()
+    suspend fun list(cursor: String? = null, query: String = ""): PostPage =
+        posts.listPosts(20, cursor, query.ifBlank { null }).value()
 
     /** 获取标签补全，返回由 OpenAPI 生成的 DTO。 */
     suspend fun suggestTags(prefix: String): List<TagSuggestion> =
         posts.suggestTags(prefix).value().items
-
-    /** 读取帖子元数据及服务端从正文派生的标签。 */
-    suspend fun post(id: String): Post = posts.getPost(UUID.fromString(id)).value().post
 
     /** 删除帖子及附件关系；对象删除由后端异步重试。 */
     suspend fun delete(id: String) {

@@ -30,7 +30,9 @@ data class UiState(
     val liveText: String = "",
     val page: String = "capture",
     val query: String = "",
-    val imagesOnly: Boolean = false,
+    val listLoading: Boolean = false,
+    val listError: Boolean = false,
+    val detailLoading: Boolean = false,
     val tagSuggestions: List<cn.hedgeho9.murmur.api.models.TagSuggestion> = emptyList(),
     val selectedTags: List<String> = emptyList(),
     val posts: List<Post> = emptyList(),
@@ -49,6 +51,8 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
     val state = mutable.asStateFlow()
     private var speech: SpeechRecorder? = null
     private var listJob: Job? = null
+    private var detailJob: Job? = null
+    private var loadedQuery: String? = null
     private var tagJob: Job? = null
     private var silentJob: Job? = null
     private var finishJob: Job? = null
@@ -107,6 +111,7 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
                 change {
                     it.copy(editor = false, editingMessage = null, editingText = "", busy = false)
                 }
+                loadedQuery = null
                 open(postId)
             } catch (_: Exception) {
                 change { it.copy(busy = false, error = "保存失败，修改仍保留在编辑框中") }
@@ -351,6 +356,7 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
                 val id = api.send(state.value.draft)
                 draft(Draft())
                 change { it.copy(editor = false, busy = false) }
+                loadedQuery = null
                 open(id)
             } catch (_: Exception) {
                 change { it.copy(busy = false, error = "保存失败，草稿已保留；请检查连接后重试") }
@@ -392,71 +398,87 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
         history()
     }
 
-    /** 切换照片筛选并重新读取第一页。 */
-    fun filterImages(value: Boolean) {
-        change { it.copy(imagesOnly = value) }
-        history()
+    /** 返回已加载列表时复用页面数据；首次进入才发起第一页请求。 */
+    fun showHistory() {
+        detailJob?.cancel()
+        change { it.copy(page = "history", detailLoading = false) }
+        if (loadedQuery == null && listJob?.isActive != true) history()
     }
 
-    /** 从服务端读取列表，按 cursor 加载更多，不重复清空已有页。 */
+    /** 查询或按 cursor 追加下一页；同一时间只允许一个分页请求。 */
     fun history(more: Boolean = false) {
-        listJob?.cancel()
-        change { it.copy(page = "history", busy = true) }
+        if (more && (listJob?.isActive == true || state.value.cursor == null)) return
+        if (!more) listJob?.cancel()
+        detailJob?.cancel()
+        val query = if (more) loadedQuery ?: state.value.query else state.value.query
+        val cursor = if (more) state.value.cursor else null
+        change {
+            it.copy(
+                page = "history",
+                listLoading = true,
+                listError = false,
+                detailLoading = false,
+                posts = if (!more && loadedQuery != query) emptyList() else it.posts,
+                cursor = if (more) it.cursor else null,
+            )
+        }
         listJob =
             viewModelScope.launch {
                 try {
-                    val page =
-                        MurmurApi(state.value.base, state.value.token)
-                            .list(
-                                if (more) state.value.cursor else null,
-                                state.value.query,
-                                state.value.imagesOnly,
-                            )
+                    val page = MurmurApi(state.value.base, state.value.token).list(cursor, query)
+                    loadedQuery = query
                     change {
                         it.copy(
                             posts =
                                 if (more) (it.posts + page.items).distinctBy { p -> p.id }
                                 else page.items,
                             cursor = page.nextCursor,
-                            busy = false,
+                            listLoading = false,
                         )
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
-                    change { it.copy(busy = false, error = "读取记录失败，请检查服务器设置") }
+                    change { it.copy(listLoading = false, listError = true) }
                 }
             }
     }
 
-    /** 打开已存在帖子，加载正文及私有图片链接。 */
+    /** 切换详情前清空上一帖；取消旧请求，避免迟到响应覆盖当前页面。 */
     fun open(id: String) {
-        change { it.copy(page = "detail", selected = id, busy = true) }
-        viewModelScope.launch {
-            try {
-                val api = MurmurApi(state.value.base, state.value.token)
-                val rows = api.detail(id)
-                val post = api.post(id)
-                change { it.copy(details = rows, selectedTags = post.tags, busy = false) }
-            } catch (_: Exception) {
-                change { it.copy(busy = false, error = "帖子读取失败") }
+        detailJob?.cancel()
+        change {
+            it.copy(
+                page = "detail",
+                selected = id,
+                details = emptyList(),
+                selectedTags = emptyList(),
+                detailLoading = true,
+            )
+        }
+        detailJob =
+            viewModelScope.launch {
+                try {
+                    val detail = MurmurApi(state.value.base, state.value.token).detail(id)
+                    change {
+                        it.copy(
+                            details = detail.messages,
+                            selectedTags = detail.post.tags,
+                            detailLoading = false,
+                        )
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    change { it.copy(detailLoading = false, error = "帖子读取失败") }
+                }
             }
-        }
     }
 
-    /** 返回取景页，保留当前未发送草稿。 */
+    /** 返回取景页并取消详情读取，保留未发送草稿和列表位置。 */
     fun capture() {
-        change { it.copy(page = "capture") }
-    }
-
-    /** 为已存在帖子准备补充草稿；不丢弃其他未发送内容。 */
-    fun reply() {
-        if (state.value.draft.text.isNotBlank() || state.value.draft.images.isNotEmpty()) {
-            editor(true)
-            return
-        }
-        draft(Draft(postId = state.value.selected))
-        editor(true)
+        detailJob?.cancel()
+        change { it.copy(page = "capture", detailLoading = false) }
     }
 
     /** 删除当前帖子后回到列表，不删除其他草稿。 */

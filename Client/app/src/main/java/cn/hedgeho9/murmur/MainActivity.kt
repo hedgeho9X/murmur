@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -30,7 +31,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -61,6 +61,7 @@ import coil.compose.AsyncImage
 import com.mikepenz.markdown.m3.Markdown
 import java.io.File
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val Green = Color(0xFF35B981)
 private val Red = Color(0xFFE65C55)
@@ -100,6 +101,9 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
     val view = LocalView.current
     val photoDrag = remember { PhotoDragState() }
     var preview by remember { mutableStateOf<Any?>(null) }
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
     var settings by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var cameraGranted by remember {
@@ -146,13 +150,14 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
             controller.unbind()
         }
     }
-    LaunchedEffect(cameraGranted, lifecycle) {
-        if (cameraGranted)
+    LaunchedEffect(cameraGranted, lifecycle, s.page, s.recording, s.draft.images.isEmpty()) {
+        if (cameraGranted && s.page == "capture" && !s.recording && s.draft.images.isEmpty())
             try {
                 controller.bindToLifecycle(lifecycle)
             } catch (_: Exception) {
                 vm.error("相机不可用")
             }
+        else controller.unbind()
     }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(s.error) {
@@ -161,320 +166,269 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
             vm.clearError()
         }
     }
+    BackHandler(enabled = !s.editor && s.page == "detail") { vm.showHistory() }
+    BackHandler(enabled = !s.editor && drawer.isOpen) { scope.launch { drawer.close() } }
     Box(Modifier.fillMaxSize()) {
-        Scaffold(
-            containerColor = Color.White,
-            snackbarHost = { SnackbarHost(snackbar) },
-            topBar = {
-                Row(
-                    Modifier.statusBarsPadding()
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = { if (s.page == "capture") vm.history() else vm.capture() },
-                        enabled = !s.recording && !s.finalizing,
-                    ) {
-                        Icon(
-                            if (s.page == "capture") Icons.Outlined.Menu
-                            else Icons.Outlined.ArrowBack,
-                            "记录列表",
-                        )
-                    }
-                    Text(
-                        "Murmur",
-                        fontSize = 22.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(onClick = { vm.editor(true) }, enabled = !s.recording) {
-                        Icon(Icons.Outlined.Edit, "打开草稿")
-                    }
-                    IconButton(onClick = { settings = true }, enabled = !s.recording && !s.busy) {
-                        Icon(Icons.Outlined.Settings, "连接设置")
-                    }
-                }
+        ModalNavigationDrawer(
+            drawerState = drawer,
+            gesturesEnabled = !s.recording && !s.finalizing && !s.editor && photoDrag.path == null,
+            drawerContent = {
+                NotesSidebar(
+                    s.page,
+                    {
+                        vm.capture()
+                        scope.launch { drawer.close() }
+                    },
+                    {
+                        vm.showHistory()
+                        scope.launch { drawer.close() }
+                    },
+                    {
+                        scope.launch { drawer.close() }
+                        settings = true
+                    },
+                )
             },
-        ) { padding ->
-            when (s.page) {
-                "capture" ->
-                    Column(
-                        Modifier.padding(padding).fillMaxSize().padding(horizontal = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Scaffold(
+                containerColor = Color.White,
+                snackbarHost = { SnackbarHost(snackbar) },
+                topBar = {
+                    Row(
+                        Modifier.statusBarsPadding()
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Spacer(Modifier.weight(.35f))
-                        Crossfade(s.recording, label = "capture") { recording ->
-                            if (recording) RecordingArea(s.liveText, s.captionVisible, s.level)
-                            else
-                                Box(
-                                    Modifier.fillMaxWidth()
-                                        .aspectRatio(1f)
-                                        .then(
-                                            if (s.draft.images.isEmpty())
-                                                Modifier.clip(RoundedCornerShape(22.dp))
-                                                    .background(Color(0xFFF1F2F3))
-                                            else Modifier
-                                        ),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    if (s.draft.images.isNotEmpty())
-                                        DraggablePhoto(
-                                            s.draft.images.first(),
-                                            photoDrag,
-                                            { preview = File(s.draft.images.first()) },
-                                            { vm.removePhoto(s.draft.images.first()) },
-                                        )
-                                    else if (cameraGranted)
-                                        AndroidView(
-                                            factory = {
-                                                PreviewView(it).apply {
-                                                    this.controller = controller
-                                                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                                                }
-                                            },
-                                            modifier = Modifier.fillMaxSize(),
-                                        )
-                                    else
-                                        IconButton(
-                                            onClick = {
-                                                cameraPermission.launch(Manifest.permission.CAMERA)
-                                            }
-                                        ) {
-                                            Icon(
-                                                Icons.Outlined.PhotoCamera,
-                                                "启用相机",
-                                                tint = Color.LightGray,
-                                                modifier = Modifier.size(34.dp),
-                                            )
-                                        }
-                                }
+                        IconButton(
+                            onClick = {
+                                if (s.page == "detail") vm.showHistory()
+                                else scope.launch { drawer.open() }
+                            },
+                            enabled = !s.recording && !s.finalizing,
+                        ) {
+                            Icon(
+                                if (s.page == "detail") Icons.Outlined.ArrowBack
+                                else Icons.Outlined.Menu,
+                                if (s.page == "detail") "返回笔记" else "打开侧栏",
+                            )
                         }
-                        Spacer(Modifier.weight(.5f))
-                        if (photoDrag.path != null) Spacer(Modifier.height(76.dp))
-                        else if (s.recording)
-                            RoundButton("停止录音", { vm.stop() }) {
-                                Box(
-                                    Modifier.size(23.dp)
-                                        .clip(RoundedCornerShape(5.dp))
-                                        .background(Red)
-                                )
+                        Text(
+                            if (s.page == "history") "全部笔记"
+                            else if (s.page == "detail") "笔记" else "Murmur",
+                            fontSize = 22.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (s.page == "capture")
+                            IconButton(onClick = { vm.editor(true) }, enabled = !s.recording) {
+                                Icon(Icons.Outlined.Edit, "打开草稿")
                             }
-                        else if (s.draft.images.isNotEmpty())
-                            Row(horizontalArrangement = Arrangement.spacedBy(64.dp)) {
-                                RoundButton("开始录音", record) {
-                                    Box(Modifier.size(26.dp).background(Red, CircleShape))
-                                }
-                                RoundButton("编辑文字", { vm.editor(true) }) {
-                                    Icon(Icons.Outlined.Edit, "编辑文字")
-                                }
-                            }
-                        else
-                            Box(
-                                Modifier.size(76.dp)
-                                    .semantics { contentDescription = "拍照，长按录音" }
-                                    .background(Color(0xFFF3F3F3), CircleShape)
-                                    .padding(9.dp)
-                                    .border(1.dp, Color(0xFF252525), CircleShape)
-                                    .padding(5.dp)
-                                    .background(Color(0xFF252525), CircleShape)
-                                    .pointerInput(cameraGranted, s.busy) {
-                                        detectTapGestures(
-                                            onLongPress = { record() },
-                                            onTap = {
-                                                if (!cameraGranted)
+                    }
+                },
+            ) { padding ->
+                when (s.page) {
+                    "capture" ->
+                        Column(
+                            Modifier.padding(padding).fillMaxSize().padding(horizontal = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Spacer(Modifier.weight(.35f))
+                            Crossfade(s.recording, label = "capture") { recording ->
+                                if (recording) RecordingArea(s.liveText, s.captionVisible, s.level)
+                                else
+                                    Box(
+                                        Modifier.fillMaxWidth()
+                                            .aspectRatio(1f)
+                                            .then(
+                                                if (s.draft.images.isEmpty())
+                                                    Modifier.clip(RoundedCornerShape(22.dp))
+                                                        .background(Color(0xFFF1F2F3))
+                                                else Modifier
+                                            ),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (s.draft.images.isNotEmpty())
+                                            DraggablePhoto(
+                                                s.draft.images.first(),
+                                                photoDrag,
+                                                { preview = File(s.draft.images.first()) },
+                                                { vm.removePhoto(s.draft.images.first()) },
+                                            )
+                                        else if (cameraGranted)
+                                            AndroidView(
+                                                factory = {
+                                                    PreviewView(it).apply {
+                                                        this.controller = controller
+                                                        scaleType =
+                                                            PreviewView.ScaleType.FILL_CENTER
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxSize(),
+                                            )
+                                        else
+                                            IconButton(
+                                                onClick = {
                                                     cameraPermission.launch(
                                                         Manifest.permission.CAMERA
                                                     )
-                                                else if (!s.busy) {
-                                                    val file =
-                                                        File(
-                                                            context.cacheDir,
-                                                            "capture-${newId()}.jpg",
-                                                        )
-                                                    controller.takePicture(
-                                                        ImageCapture.OutputFileOptions.Builder(file)
-                                                            .build(),
-                                                        ContextCompat.getMainExecutor(context),
-                                                        object : ImageCapture.OnImageSavedCallback {
-                                                            override fun onImageSaved(
-                                                                result:
-                                                                    ImageCapture.OutputFileResults
-                                                            ) {
-                                                                view.performHapticFeedback(
-                                                                    android.view
-                                                                        .HapticFeedbackConstants
-                                                                        .CONFIRM
-                                                                )
-                                                                vm.addPhoto(Uri.fromFile(file))
-                                                            }
-
-                                                            override fun onError(
-                                                                exception: ImageCaptureException
-                                                            ) {
-                                                                vm.error("拍照失败")
-                                                            }
-                                                        },
-                                                    )
                                                 }
-                                            },
-                                        )
+                                            ) {
+                                                Icon(
+                                                    Icons.Outlined.PhotoCamera,
+                                                    "启用相机",
+                                                    tint = Color.LightGray,
+                                                    modifier = Modifier.size(34.dp),
+                                                )
+                                            }
                                     }
-                            )
-                        Spacer(Modifier.height(72.dp))
-                    }
-                "history" ->
-                    LazyColumn(
-                        Modifier.padding(padding)
-                            .fillMaxSize()
-                            .background(Color(0xFFF7F7F7))
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        item {
-                            OutlinedTextField(
-                                s.query,
-                                vm::query,
-                                placeholder = { Text("搜索记录", color = Color(0xFF999999)) },
-                                shape = RoundedCornerShape(12.dp),
-                                colors =
-                                    OutlinedTextFieldDefaults.colors(
-                                        unfocusedBorderColor = Color(0xFFE5E5E5),
-                                        focusedBorderColor = Color(0xFF999999),
-                                        unfocusedContainerColor = Color.White,
-                                        focusedContainerColor = Color.White,
-                                    ),
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                                trailingIcon = {
-                                    IconButton(onClick = { vm.history() }) {
-                                        Icon(Icons.Outlined.Search, "搜索")
-                                    }
-                                },
-                            )
-                            if (s.query.startsWith("#"))
-                                TagSuggestions(s.tagSuggestions, vm::searchTag)
-                            FilterChip(
-                                selected = s.imagesOnly,
-                                shape = RoundedCornerShape(8.dp),
-                                colors =
-                                    FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFFEAEAEA)
-                                    ),
-                                onClick = { vm.filterImages(!s.imagesOnly) },
-                                label = { Text("有照片") },
-                            )
-                        }
-                        items(s.posts, key = { it.id.toString() }) { post ->
-                            Column(
-                                Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color.White)
-                                    .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(14.dp))
-                                    .clickable { vm.open(post.id.toString()) }
-                                    .padding(14.dp)
-                            ) {
-                                Text(
-                                    java.time.Instant.parse(post.createdAt)
-                                        .atZone(java.time.ZoneId.systemDefault())
-                                        .format(
-                                            java.time.format.DateTimeFormatter.ofPattern(
-                                                "yyyy-MM-dd HH:mm"
-                                            )
-                                        ),
-                                    color = Color.Gray,
-                                    fontSize = 12.sp,
-                                )
-                                TagRow(post.tags, vm::searchTag)
-                                Spacer(Modifier.height(8.dp))
-                                Markdown(
-                                    post.title
-                                        ?: post.preview?.takeIf { it.isNotBlank() }
-                                        ?: "照片记录",
-                                    modifier =
-                                        Modifier.fillMaxWidth()
-                                            .heightIn(max = 112.dp)
-                                            .clipToBounds(),
-                                )
                             }
-                        }
-                        item {
-                            if (s.busy) CircularProgressIndicator(Modifier.padding(24.dp))
-                            else if (s.posts.isEmpty())
-                                Text(
-                                    "还没有记录",
-                                    color = Color.Gray,
-                                    modifier = Modifier.padding(vertical = 48.dp),
-                                )
-                            if (s.cursor != null)
-                                TextButton(onClick = { vm.history(true) }) { Text("加载更多") }
-                            Button(
-                                onClick = { vm.capture() },
-                                shape = RoundedCornerShape(12.dp),
-                                colors =
-                                    ButtonDefaults.buttonColors(containerColor = Color(0xFF242424)),
-                            ) {
-                                Text("＋", fontSize = 24.sp)
-                            }
-                        }
-                    }
-                "detail" ->
-                    Column(Modifier.padding(padding).fillMaxSize()) {
-                        LazyColumn(Modifier.weight(1f).padding(horizontal = 24.dp)) {
-                            item { TagRow(s.selectedTags, vm::searchTag) }
-                            items(s.details) { message ->
-                                var expanded by remember { mutableStateOf(false) }
-                                Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                                    if (message.role == "user")
-                                        IconButton(
-                                            onClick = { vm.editPublished(message) },
-                                            modifier = Modifier.align(Alignment.End),
-                                        ) {
-                                            Icon(Icons.Outlined.Edit, "编辑笔记")
-                                        }
-
-                                    if (message.process)
-                                        TextButton(onClick = { expanded = !expanded }) {
-                                            Text(if (expanded) "收起执行过程" else "查看执行过程")
-                                        }
-                                    if (!message.process || expanded) Markdown(message.text)
-                                    LazyRow {
-                                        items(message.images) { url ->
-                                            AsyncImage(
-                                                url,
-                                                "记录图片",
-                                                Modifier.padding(top = 12.dp, end = 8.dp)
-                                                    .size(150.dp)
-                                                    .clickable { preview = url }
-                                                    .clip(RoundedCornerShape(10.dp)),
-                                                contentScale = ContentScale.Crop,
-                                            )
-                                        }
-                                    }
-                                    HorizontalDivider(
-                                        Modifier.padding(top = 20.dp),
-                                        color = Color(0xFFEEEEEE),
+                            Spacer(Modifier.weight(.5f))
+                            if (photoDrag.path != null) Spacer(Modifier.height(76.dp))
+                            else if (s.recording)
+                                RoundButton("停止录音", { vm.stop() }) {
+                                    Box(
+                                        Modifier.size(23.dp)
+                                            .clip(RoundedCornerShape(5.dp))
+                                            .background(Red)
                                     )
+                                }
+                            else if (s.draft.images.isNotEmpty())
+                                Row(horizontalArrangement = Arrangement.spacedBy(64.dp)) {
+                                    RoundButton("开始录音", record) {
+                                        Box(Modifier.size(26.dp).background(Red, CircleShape))
+                                    }
+                                    RoundButton("编辑文字", { vm.editor(true) }) {
+                                        Icon(Icons.Outlined.Edit, "编辑文字")
+                                    }
+                                }
+                            else
+                                Box(
+                                    Modifier.size(76.dp)
+                                        .semantics { contentDescription = "拍照，长按录音" }
+                                        .background(Color(0xFFF3F3F3), CircleShape)
+                                        .padding(9.dp)
+                                        .border(1.dp, Color(0xFF252525), CircleShape)
+                                        .padding(5.dp)
+                                        .background(Color(0xFF252525), CircleShape)
+                                        .pointerInput(cameraGranted, s.busy) {
+                                            detectTapGestures(
+                                                onLongPress = { record() },
+                                                onTap = {
+                                                    if (!cameraGranted)
+                                                        cameraPermission.launch(
+                                                            Manifest.permission.CAMERA
+                                                        )
+                                                    else if (!s.busy) {
+                                                        val file =
+                                                            File(
+                                                                context.cacheDir,
+                                                                "capture-${newId()}.jpg",
+                                                            )
+                                                        controller.takePicture(
+                                                            ImageCapture.OutputFileOptions.Builder(
+                                                                    file
+                                                                )
+                                                                .build(),
+                                                            ContextCompat.getMainExecutor(context),
+                                                            object :
+                                                                ImageCapture.OnImageSavedCallback {
+                                                                override fun onImageSaved(
+                                                                    result:
+                                                                        ImageCapture.OutputFileResults
+                                                                ) {
+                                                                    view.performHapticFeedback(
+                                                                        android.view
+                                                                            .HapticFeedbackConstants
+                                                                            .CONFIRM
+                                                                    )
+                                                                    vm.addPhoto(Uri.fromFile(file))
+                                                                }
+
+                                                                override fun onError(
+                                                                    exception: ImageCaptureException
+                                                                ) {
+                                                                    vm.error("拍照失败")
+                                                                }
+                                                            },
+                                                        )
+                                                    }
+                                                },
+                                            )
+                                        }
+                                )
+                            Spacer(Modifier.height(72.dp))
+                        }
+                    "history" -> NotesList(s, vm, padding, listState)
+                    "detail" ->
+                        Column(Modifier.padding(padding).fillMaxSize()) {
+                            if (s.detailLoading)
+                                Box(
+                                    Modifier.weight(1f).fillMaxWidth(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator(
+                                        Modifier.size(24.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                }
+                            else
+                                key(s.selected) {
+                                    LazyColumn(Modifier.weight(1f).padding(horizontal = 24.dp)) {
+                                        item { TagRow(s.selectedTags, vm::searchTag) }
+                                        items(s.details, key = { it.id }) { message ->
+                                            var expanded by remember { mutableStateOf(false) }
+                                            Column(
+                                                Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                                            ) {
+                                                if (message.role == "user")
+                                                    IconButton(
+                                                        onClick = { vm.editPublished(message) },
+                                                        modifier = Modifier.align(Alignment.End),
+                                                    ) {
+                                                        Icon(Icons.Outlined.Edit, "编辑笔记")
+                                                    }
+
+                                                if (message.process)
+                                                    TextButton(onClick = { expanded = !expanded }) {
+                                                        Text(if (expanded) "收起执行过程" else "查看执行过程")
+                                                    }
+                                                if (!message.process || expanded)
+                                                    Markdown(message.text)
+                                                LazyRow {
+                                                    items(message.images) { url ->
+                                                        AsyncImage(
+                                                            url,
+                                                            "记录图片",
+                                                            Modifier.padding(
+                                                                    top = 12.dp,
+                                                                    end = 8.dp,
+                                                                )
+                                                                .size(150.dp)
+                                                                .clickable { preview = url }
+                                                                .clip(RoundedCornerShape(10.dp)),
+                                                            contentScale = ContentScale.Crop,
+                                                        )
+                                                    }
+                                                }
+                                                HorizontalDivider(
+                                                    Modifier.padding(top = 20.dp),
+                                                    color = Color(0xFFEEEEEE),
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            Row(
+                                Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                IconButton(onClick = { confirmDelete = true }) {
+                                    Icon(Icons.Outlined.Delete, "删除帖子")
                                 }
                             }
                         }
-                        Row(
-                            Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            IconButton(onClick = { confirmDelete = true }) {
-                                Icon(Icons.Outlined.Delete, "删除帖子")
-                            }
-                            Button(
-                                onClick = { vm.reply() },
-                                shape = RoundedCornerShape(12.dp),
-                                colors =
-                                    ButtonDefaults.buttonColors(containerColor = Color(0xFF242424)),
-                            ) {
-                                Text("补充记录")
-                            }
-                        }
-                    }
+                }
             }
         }
         if (s.editor) {
