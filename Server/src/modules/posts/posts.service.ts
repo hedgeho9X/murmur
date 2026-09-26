@@ -1,5 +1,5 @@
 /**
- * 校验帖子业务输入，协调幂等创建、图片绑定与列表响应。
+ * 校验帖子业务输入，协调事务创建、图片绑定与列表响应。
  * 所有数据库访问交由仓储，消息正文在创建后不允许修改。
  */
 import { ApiError } from "../../common/errors.js";
@@ -7,24 +7,22 @@ import { wire } from "../../common/serialization.js";
 import type { NewPost } from "./posts.contracts.js";
 import type { PostsRepository, PostCursor } from "./posts.repository.js";
 import type { ImagesRepository } from "../images/images.repository.js";
-import type { IdempotencyRepository } from "../idempotency/idempotency.repository.js";
 /**
  * 提供帖子创建、读取、改名和删除能力，协调跨模块仓储而不直接编写 SQL。
  */
 export class PostsService {
   /**
-   * 注入帖子、图片和幂等仓储，要求它们使用同一数据库以共享创建事务。
+   * 注入帖子和图片仓储，要求它们使用同一数据库以共享创建事务。
    */
   constructor(
     private readonly posts: PostsRepository,
     private readonly images: ImagesRepository,
-    private readonly idempotency: IdempotencyRepository,
   ) {}
   /**
-   * 校验正文与附件，按幂等键原子创建帖子、首条消息、图片归属和响应回执。
+   * 校验正文与附件，按客户端 UUIDv7 原子创建帖子、首条消息与图片归属。
    * 返回创建快照；空内容、重复图片或不可用图片会拒绝请求，不留下部分写入。
    */
-  async create(input: NewPost, key: string) {
+  async create(input: NewPost) {
     if (
       !input.content.parts.some(
         (p) => p.type === "image" || p.text.trim().length,
@@ -40,25 +38,22 @@ export class PostsService {
         "DUPLICATE_IMAGE",
         "Each image may appear only once",
       );
-    return this.idempotency.once(
-      "create-post",
-      key,
-      { ...input, title: input.title ?? null },
-      async (tx) => {
-        const result = await this.posts.create(tx, input);
-        // 按固定顺序获取图片行锁，避免并发帖子绑定重叠图片时发生死锁。
-        for (const id of [...ids].sort()) {
-          if (!(await this.images.attach(tx, id, result.message.id)))
-            throw new ApiError(
-              409,
-              "IMAGE_UNAVAILABLE",
-              "Image is missing, unfinished or already attached",
-            );
-        }
-        return result;
-      },
-    );
+    const result = await this.posts.create(input, async (tx, messageId) => {
+      // 按固定顺序获取图片行锁，避免并发绑定重叠图片时发生死锁。
+      for (const id of [...ids].sort()) {
+        if (!(await this.images.attach(tx, id, messageId)))
+          throw new ApiError(
+            409,
+            "IMAGE_UNAVAILABLE",
+            "Image is missing, unfinished or already attached",
+          );
+      }
+    });
+    if (!result)
+      throw new ApiError(409, "POST_ALREADY_EXISTS", "Post ID already exists");
+    return wire(result);
   }
+
   /**
    * 按 ID 返回帖子和消息的 JSON 快照；不存在时抛出可公开的 404 异常。
    */

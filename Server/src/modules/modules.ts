@@ -8,20 +8,18 @@ import { PostsRepository } from "./posts/posts.repository.js";
 import { PostsService } from "./posts/posts.service.js";
 import { ImagesRepository } from "./images/images.repository.js";
 import { ImagesService } from "./images/images.service.js";
-import { IdempotencyRepository } from "./idempotency/idempotency.repository.js";
 /**
  * 供 HTTP 层调用的模块服务集合，不暴露数据库连接和仓储对象。
  */
 export type Services = { posts: PostsService; images: ImagesService };
 /**
- * 接收数据库客户端与 S3 适配器，构造帖子、图片服务及共享的幂等仓储。
+ * 接收数据库客户端与 S3 适配器，构造帖子、图片服务。
  * 返回服务集合；此过程不发送查询或存储请求。
  */
 export function createServices(db: DB, storage: Storage): Services {
-  const idempotency = new IdempotencyRepository(db);
   const images = new ImagesRepository(db);
   return {
-    posts: new PostsService(new PostsRepository(db), images, idempotency),
-    images: new ImagesService(images, storage, idempotency),
+    posts: new PostsService(new PostsRepository(db), images),
+    images: new ImagesService(images, storage),
   };
 }

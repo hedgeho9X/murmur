@@ -27,17 +27,17 @@ class ContractTest : ShouldSpec() {
                 codec.parseToJsonElement(codec.encodeToString(decoded)) shouldBe codec.parseToJsonElement(sample)
             }
         }
-        should("create, replay, fetch and delete through generated Retrofit APIs") {
+        should("create, reject duplicate UUID, fetch and delete through generated Retrofit APIs") {
             runBlocking {
                 val token = requireNotNull(System.getenv("API_TOKEN"))
                 val api = ApiClient(baseUrl = "http://127.0.0.1:${System.getenv("PORT") ?: "8787"}/", authNames = arrayOf("bearerAuth")).setBearerToken(token).createService(PostsApi::class.java)
-                val request = Serializer.kotlinxSerializationJson.decodeFromString<CreatePostRequest>("""{"content":{"parts":[{"type":"text","text":"Kotlin integration acceptance"}]}}""")
-                val key = UUID.randomUUID().toString()
-                val response = api.createPost(key, request)
+                val postId = "01993240-1000-7000-8000-" + UUID.randomUUID().toString().replace("-", "").takeLast(12)
+                val request = Serializer.kotlinxSerializationJson.decodeFromString<CreatePostRequest>("""{"id":"$postId","content":{"parts":[{"type":"text","text":"Kotlin integration acceptance"}]}}""")
+                val response = api.createPost(request)
                 response.code() shouldBe 201
                 val result = requireNotNull(response.body())
                 try {
-                    api.createPost(key, request).body() shouldBe result
+                    api.createPost(request).code() shouldBe 409
                     val detail = requireNotNull(api.getPost(result.post.id).body())
                     detail.messages.size shouldBe 1
                     (detail.messages.first() as Message.UserWrapper).value.id shouldBe result.message.id
@@ -45,7 +45,6 @@ class ContractTest : ShouldSpec() {
                     api.deletePost(result.post.id).code() shouldBe 204
                 }
                 api.getPost(result.post.id).code() shouldBe 404
-                api.createPost(key, request).code() shouldBe 410
             }
         }
     }

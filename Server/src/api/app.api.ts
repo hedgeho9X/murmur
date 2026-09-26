@@ -82,7 +82,7 @@ export function createApp(services: Services, token: string) {
       {
         error: {
           code: "INTERNAL_ERROR",
-          message: "Request failed; retry with the same idempotency key",
+          message: "Request failed",
         },
       },
       500,

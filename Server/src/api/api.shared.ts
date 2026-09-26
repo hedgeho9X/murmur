@@ -10,7 +10,7 @@ export const json = (schema: z.ZodType) => ({
 });
 /** 各业务路由复用的错误响应结构，实际状态由异常处理器决定。 */
 export const errors = Object.fromEntries(
-  [400, 401, 404, 409, 410, 413, 422, 500, 503].map((code) => [
+  [400, 401, 404, 409, 413, 422, 500, 503].map((code) => [
     code,
     { ...json(C.ErrorResponse), description: "Error" },
   ]),

@@ -26,18 +26,16 @@ interface PostsApi {
      *  - 401: Error
      *  - 404: Error
      *  - 409: Error
-     *  - 410: Error
      *  - 413: Error
      *  - 422: Error
      *  - 500: Error
      *  - 503: Error
      *
-     * @param idempotencyKey 
      * @param createPostRequest 
      * @return [CreatedPost]
      */
     @POST("api/v1/posts")
-    suspend fun createPost(@Header("Idempotency-Key") idempotencyKey: kotlin.String, @Body createPostRequest: CreatePostRequest): Response<CreatedPost>
+    suspend fun createPost(@Body createPostRequest: CreatePostRequest): Response<CreatedPost>
 
     /**
      * DELETE api/v1/posts/{id}
@@ -49,7 +47,6 @@ interface PostsApi {
      *  - 401: Error
      *  - 404: Error
      *  - 409: Error
-     *  - 410: Error
      *  - 413: Error
      *  - 422: Error
      *  - 500: Error
@@ -71,7 +68,6 @@ interface PostsApi {
      *  - 401: Error
      *  - 404: Error
      *  - 409: Error
-     *  - 410: Error
      *  - 413: Error
      *  - 422: Error
      *  - 500: Error
@@ -93,7 +89,6 @@ interface PostsApi {
      *  - 401: Error
      *  - 404: Error
      *  - 409: Error
-     *  - 410: Error
      *  - 413: Error
      *  - 422: Error
      *  - 500: Error
@@ -116,7 +111,6 @@ interface PostsApi {
      *  - 401: Error
      *  - 404: Error
      *  - 409: Error
-     *  - 410: Error
      *  - 413: Error
      *  - 422: Error
      *  - 500: Error

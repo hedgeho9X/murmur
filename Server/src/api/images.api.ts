@@ -3,10 +3,9 @@
  */
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import * as C from "../modules/images/images.contracts.js";
-import { KeyHeader } from "../common/contracts.js";
 import type { ImagesService } from "../modules/images/images.service.js";
 import { json, errors, security, params } from "./api.shared.js";
-/** 申请图片上传的 OpenAPI 契约，定义类型、大小和幂等请求头。 */
+/** 申请图片上传的 OpenAPI 契约，定义类型、大小。 */
 const createImageUploadRoute = createRoute({
   method: "post",
   path: "/api/v1/images/uploads",
@@ -14,7 +13,6 @@ const createImageUploadRoute = createRoute({
   tags: ["Images"],
   security,
   request: {
-    headers: KeyHeader,
     body: {
       required: true,
       content: { "application/json": { schema: C.UploadRequest } },
@@ -62,13 +60,7 @@ export function registerImagesApi(app: OpenAPIHono, service: ImagesService) {
    * 申请图片记录及临时上传签名地址。
    */
   app.openapi(createImageUploadRoute, async (c) =>
-    c.json(
-      await service.createUpload(
-        c.req.valid("json"),
-        c.req.valid("header")["Idempotency-Key"],
-      ),
-      201,
-    ),
+    c.json(await service.createUpload(c.req.valid("json")), 201),
   );
   /**
    * POST /api/v1/images/{id}/complete

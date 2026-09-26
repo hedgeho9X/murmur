@@ -2,59 +2,53 @@
 
 本切片实现 Hono 帖子 CRUD、图片上传及 Kotlin 客户端契约；不调用 Hermes。
 
-## 已确认的数据边界
+## 数据边界
 
 - Post 是持续会话的容器，只有标题可以修改。
-- Message 入库后不可 UPDATE；数据库触发器强制这一点。删除所属帖子时可以级联 DELETE。
-- `role` 为 user / assistant / tool。工具调用位于 assistant.content.parts，工具结果是独立 tool 消息。
-- `content` 是 JSONB 对象，包含有序 parts。is_error 在工具 content 中；finish_reason 在 assistant content 中。
-- `turn_id` 是一次发送及其整段回应；不是排序号，也不是某个模型请求 ID。
-- 不使用 sequence、input_source、version、messages.updated_at 或独立 tool_calls 表。
-- 数据库时间精度固定到毫秒，与 API/Android 时间解析一致；消息按 created_at、id 稳定排序。当前不支持消息分支或并发回应排序。
-- 图片按 parts 数组顺序展示；images.message_id 表达单一归属，因此不需要重复维护 message_images 关联表。
+- Android 在创建草稿时生成 UUIDv7，并在本地保存为 post.id；编辑与网络重试不换 ID。
+- 创建接口必须接收客户端 UUIDv7，不生成帖子 ID。数据库主键防止重复，已存在时统一返回 409 POST_ALREADY_EXISTS，不比较内容或返回首次响应。
+- 手机因断网无法确认创建结果时，可用同一 ID 重试；收到 409 后 GET 该帖子。
+- 物理删除后不保留墓碑，同一 ID 可以重新创建。客户端应取消已删除草稿的待发送请求。
+- Message 入库后不可 UPDATE；数据库触发器强制这一点。删除所属帖子时级联 DELETE。
+- role 为 user / assistant / tool。工具调用位于 assistant.content.parts，工具结果是独立 tool 消息。
+- content 是 JSONB 对象，包含有序 parts。is_error 在工具 content 中；finish_reason 在 assistant content 中。
+- turn_id 是一次发送及其整段回应；不是排序号，也不是模型请求 ID。
+- 不使用 sequence、input_source、version、messages.updated_at、独立 tool_calls 或幂等回执表。
+- 数据库时间精度为毫秒。消息与帖子仍按 created_at、id 稳定排序；UUIDv7 的时间顺序不替代服务端创建时间。
+- 图片按 parts 数组顺序展示；images.message_id 表达单一归属。
 
 ## 创建链路
 
-Android → Hono/Zod 验证 → 事务内幂等锁 → 创建 Post → 创建 user Message → 原子绑定 ready 图片 → 保存响应回执 → 提交 → 201。
+Android（已保存的 UUIDv7）→ Hono/Zod 校验 → PostgreSQL 事务插入 Post → 插入 user Message → 绑定 ready 图片 → 提交 → 201。
 
-事务任一步失败全部回滚。幂等键按操作隔离；请求内容规范化后哈希。相同键/内容返回首次创建快照（标题后来改名也不改变首次快照）；不同内容为 409。
-删除后留下无正文的幂等墓碑，返回 410，不会复活帖子。墓碑保留请求 SHA-256，不保留原文响应。
+帖子主键冲突时不插入消息，返回 409。图片绑定失败时帖子、消息和此前附件绑定全部回滚，可以使用同一 ID 修正请求后重试。
 
 ## 图片链路
 
-申请 upload → Android PUT 临时 S3 key → complete 检查大小并实际解码 → 将已验证字节写入不可由上传链接修改的最终 key → ready → 发帖关联。
+申请 upload → Android PUT 临时 S3 key → complete 检查大小并实际解码 → 将已验证字节写入最终 key → ready → 发帖关联。
 
-支持单帧 JPEG/PNG/WebP，最多 10 MiB、2500 万像素。bucket 非公开，读取返回 5 分钟签名 URL。上传链接 15 分钟；重试申请可刷新链接但沿用同一图片 ID。
-complete 会持有图片行锁直到存储验证完成，这是单用户第一版的简化取舍。若存储成功、事务失败，重试仍能完成；无人重试的记录在一天后进入清理。
+上传申请不需要幂等键，每次生成独立图片 ID；重复申请可能留下未绑定图片，一天后回收。已取得 ID 和签名地址时可重试同一临时 PUT，complete 仍可重复调用。
+支持单帧 JPEG/PNG/WebP，最多 10 MiB、2500 万像素。bucket 非公开；GET 签名 5 分钟，PUT 签名 15 分钟。
+complete 持有图片行锁直到存储验证完成。若 S3 成功、数据库事务失败，可重试完成；无人重试的记录会过期清理。
 
-删除 Post → PostgreSQL 外键删除 Message/Image → 同事务触发器写 object_cleanup → API 每分钟重试 S3 删除。失败保留清理项。未绑定图片一天后过期；staging bucket lifecycle 是旧链接再上传的兜底。
+删除 Post → 外键删除 Message/Image → 同事务触发器写 object_cleanup → API 每分钟重试 S3 删除。临时对象生命周期策略处理旧上传链接被再次使用的遗留对象。
 
-## 尚未接入的能力
-
-- Hermes 调用、assistant/tool 的运行时写入、执行结束与中断落库、流式事件持久化。
-- 当前只开放首条 user 消息创建；后续追加消息需要单独接口与工具配对校验，不能让客户端伪造 assistant/tool。
-- 搜索、附件筛选、完整 Android UI 和真机网络验收。
-- 消息生成中先流式展示，单条结束或明确中断后 INSERT；服务崩溃前的流式片段恢复需要事件持久化，当前未实现。
-
-## 契约与客户端
+## 契约与目录
 
 Hono Zod route → OpenAPI 3.0.3 → Scalar + 固定版本 OpenAPI Generator → Kotlin Retrofit/coroutines/kotlinx.serialization。
-多态按 type/role discriminator 生成；任意 JSON 映射到 JsonElement，不能使用无法序列化的 Any。生成代码不手改。鉴权策略、重试决策和 Android 状态管理留给调用方。
+任意 JSON 映射为 JsonElement；生成代码不手改。认证、Android 草稿持久化与重试决策由调用方负责。
 
-## 目录与职责
+- src/api/：命名 createRoute 定义与路由注册，注册上方标明方法和路径。
+- src/modules/posts/：帖子契约、服务、仓储。
+- src/modules/images/：图片契约、服务、仓储、S3 适配与清理。
+- src/modules/messages/：消息内容契约。
+- src/database/schemas/：posts、messages、images 模块表；图片清理队列与图片表同文件。外键直接引用目标 schema，index.ts 统一导出。
+- src/database/database.client.ts：数据库连接。
+- src/common/：共享契约、异常和序列化。
 
-采用按业务模块组织（feature-based modules）和点分隔职责命名（module.role.ts）。
+调用链 api → service → repository → PostgreSQL；图片 service 另调用 S3 适配器。创建仓储将同一事务传给附件回调，避免跨模块部分提交。
 
-- `src/api/app.api.ts`：HTTP 中间件、错误响应、模块路由与 Scalar 装配。
-- `src/api/posts.api.ts`、`src/api/images.api.ts`：请求校验、调用 service、响应序列化。
-- `src/modules/posts/`：posts.contracts.ts、posts.service.ts、posts.repository.ts。
-- `src/modules/images/`：images.contracts.ts、images.service.ts、images.repository.ts、images.storage.ts、images.cleanup.ts。
-- `src/modules/messages/messages.contracts.ts`：消息与内容块契约；尚无独立消息写入 API，不创建空 service/repository。
-- `src/modules/idempotency/idempotency.repository.ts`：可跨模块使用的幂等事务与响应回执。
-- `src/modules/modules.ts`：实例装配，向 HTTP 层注入服务。
-- `src/database/database.client.ts`：数据库连接；`src/database/schemas/` 按 posts、messages、images、idempotency 模块拆分表定义，`index.ts` 统一导出，图片清理队列与图片表同文件。跨表外键直接引用目标 schema 文件，不通过汇总入口。SQL 迁移继续在根 migrations/。
-- `src/common/`：通用 ID/错误契约、异常和序列化帮助函数。
+## 当前边界
 
-调用链：api → service → repository → PostgreSQL；图片 service 另调用 images.storage → S3。
-service 负责业务校验、流程与跨模块协作；repository 负责 SQL、行锁和一致性读取。创建帖子时各 repository 共享同一个幂等事务，不能各自开启独立事务。
-新增业务时在 modules/ 下建同名目录，在 api/ 下增加相应入口；只创建实际需要的职责文件。
+尚未接入 Hermes、流式执行、服务崩溃时片段恢复、追加消息 API、搜索筛选和 Android UI。当前 HTTP 只接受首条 user 消息，不能由客户端伪造 assistant/tool。
+消息生成中先实时展示，结束或中断后 INSERT 的运行时逻辑属于后续切片。

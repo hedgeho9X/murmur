@@ -15,6 +15,13 @@
       "when": 1790417350040,
       "tag": "0001_redact_deleted_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790420148051,
+      "tag": "0002_wandering_sleeper",
+      "breakpoints": true
     }
   ]
 }

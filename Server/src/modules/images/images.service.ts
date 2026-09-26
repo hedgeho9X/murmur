@@ -7,35 +7,25 @@ import { wire } from "../../common/serialization.js";
 import { ApiError } from "../../common/errors.js";
 import type { ImagesRepository } from "./images.repository.js";
 import type { Storage } from "./images.storage.js";
-import type { IdempotencyRepository } from "../idempotency/idempotency.repository.js";
 /**
  * 提供图片生命周期操作，确保未验证的临时上传不能作为已发布图片读取。
  */
 export class ImagesService {
   /**
-   * 注入图片仓储、S3 适配器和共享幂等仓储；构造时不产生外部请求。
+   * 注入图片仓储和 S3 适配器；构造时不产生外部请求。
    */
   constructor(
     private readonly images: ImagesRepository,
     private readonly storage: Storage,
-    private readonly idempotency: IdempotencyRepository,
   ) {}
   /**
-   * 按声明的类型、大小和幂等键申请图片记录，返回元数据及短期上传地址。
-   * 重试沿用图片 ID，但重新签发临时对象上传地址。
+   * 按声明的类型和大小申请新的图片记录，返回元数据及短期上传地址。
+   * 每次请求分配新图片 ID；未被帖子引用的上传由过期清理回收。
    */
-  async createUpload(
-    input: { content_type: string; size_bytes: number },
-    key: string,
-  ) {
-    const result = await this.idempotency.once(
-      "image-upload",
-      key,
-      input,
-      async (tx) => ({
-        image: Image.parse(wire(await this.images.create(tx, input))),
-      }),
-    );
+  async createUpload(input: { content_type: string; size_bytes: number }) {
+    const result = {
+      image: Image.parse(wire(await this.images.create(input))),
+    };
     return {
       ...result,
       upload_url: await this.storage.uploadUrl(

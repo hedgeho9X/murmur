@@ -2,4 +2,3 @@
 export { posts } from "./posts.schema.js";
 export { messages } from "./messages.schema.js";
 export { images, objectCleanup } from "./images.schema.js";
-export { idempotency } from "./idempotency.schema.js";

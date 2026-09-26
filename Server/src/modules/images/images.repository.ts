@@ -19,12 +19,12 @@ export class ImagesRepository {
    */
   constructor(private readonly db: DB) {}
   /**
-   * 在传入事务内分配图片 ID、临时键和最终键，写入待上传记录并返回。
-   * 不创建 S3 对象，不自行提交事务。
+   * 分配图片 ID、临时键和最终键，写入新的待上传记录并返回。
+   * 每次申请创建独立记录，不创建 S3 对象。
    */
-  async create(tx: Tx, input: { content_type: string; size_bytes: number }) {
+  async create(input: { content_type: string; size_bytes: number }) {
     const id = randomUUID();
-    const [image] = await tx
+    const [image] = await this.db
       .insert(images)
       .values({
         id,

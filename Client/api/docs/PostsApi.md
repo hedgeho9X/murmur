@@ -24,16 +24,14 @@ All URIs are relative to *http://localhost*
 val apiClient = ApiClient()
 apiClient.setBearerToken("TOKEN")
 val webService = apiClient.createWebservice(PostsApi::class.java)
-val idempotencyKey : kotlin.String = idempotencyKey_example // kotlin.String | 
 val createPostRequest : CreatePostRequest =  // CreatePostRequest | 
 
 launch(Dispatchers.IO) {
-    val result : CreatedPost = webService.createPost(idempotencyKey, createPostRequest)
+    val result : CreatedPost = webService.createPost(createPostRequest)
 }
 ```
 
 ### Parameters
-| **idempotencyKey** | **kotlin.String**|  | |
 | Name | Type | Description  | Notes |
 | ------------- | ------------- | ------------- | ------------- |
 | **createPostRequest** | [**CreatePostRequest**](CreatePostRequest.md)|  | |

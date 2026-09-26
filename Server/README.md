@@ -28,12 +28,12 @@ npm run dev # 启动 Hono，默认仅本机可访问
 
 | 方法   | 路径                         | 行为                                                 |
 | ------ | ---------------------------- | ---------------------------------------------------- |
-| POST   | /api/v1/posts                | 原子创建帖子和第一条 user 消息；必带 Idempotency-Key |
+| POST   | /api/v1/posts                | 接收客户端 UUIDv7，事务创建帖子与首条消息；重复 ID 返回 409 |
 | GET    | /api/v1/posts                | limit/cursor 分页                                    |
 | GET    | /api/v1/posts/{id}           | 帖子及有序消息                                       |
 | PATCH  | /api/v1/posts/{id}           | 仅修改 title，null 清空                              |
 | DELETE | /api/v1/posts/{id}           | 级联删除，重复删除返回 204                           |
-| POST   | /api/v1/images/uploads       | 幂等申请签名 PUT，必带 Idempotency-Key               |
+| POST   | /api/v1/images/uploads       | 申请新图片及签名 PUT，每次请求生成新图片 ID               |
 | POST   | /api/v1/images/{id}/complete | 校验真实图片并完成上传，重复调用安全                 |
 | GET    | /api/v1/images/{id}/url      | ready 图片的临时读取地址                             |
 
@@ -42,6 +42,7 @@ npm run dev # 启动 Hono，默认仅本机可访问
 ```jsonc
 {
   // 创建帖子及第一条用户消息
+  "id": "01993240-1000-7000-8000-000000000001", // 客户端生成一次并保存在草稿中的 UUIDv7
   "title": "一个想法", // 可省略或传 null
   "content": {
     // 消息内容
@@ -50,7 +51,7 @@ npm run dev # 启动 Hono，默认仅本机可访问
       { "type": "text", "text": "先记录，再一起思考" }, // 支持纯文本发帖
     ], // 图片块使用 type=image、image_id=已完成上传的ID
   }, // 不传 role、turn_id 或客户端时间
-} // 重试必须复用原 Idempotency-Key
+} // 重试复用原帖子 ID；409 后按 ID 查询已创建的帖子
 ```
 
 ## 验证与生成

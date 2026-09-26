@@ -5,6 +5,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { v7 as uuidv7 } from "uuid";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { eq, sql } from "drizzle-orm";
 import sharp from "sharp";
@@ -31,23 +32,24 @@ const { db, pool } = connect(url.toString());
 const storage = new Storage(c);
 const app = createApp(createServices(db, storage), c.API_TOKEN);
 /**
- * 构造带认证和幂等键的请求并交给实际 Hono 路由，返回 HTTP 响应。
+ * 构造带认证和客户端帖子 ID的请求并交给实际 Hono 路由，返回 HTTP 响应。
  * 有请求体时进行 JSON 编码；测试产生的业务写入由测试生命周期清理。
  */
-function request(
-  path: string,
-  method = "GET",
-  body?: unknown,
-  key = randomUUID(),
-) {
+function request(path: string, method = "GET", body?: unknown, id = uuidv7()) {
   return app.request(path, {
     method,
     headers: {
       Authorization: "Bearer " + c.API_TOKEN,
       "Content-Type": "application/json",
-      "Idempotency-Key": key,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body:
+      body === undefined
+        ? undefined
+        : JSON.stringify(
+            path === "/api/v1/posts" && method === "POST"
+              ? { id, ...(body as object) }
+              : body,
+          ),
   });
 }
 /**
@@ -94,7 +96,6 @@ test("authentication, validation and immutable user role", async () => {
         headers: {
           Authorization: "Bearer " + c.API_TOKEN,
           "Content-Type": "application/json",
-          "Idempotency-Key": randomUUID(),
         },
         body: "{",
       })
@@ -102,40 +103,65 @@ test("authentication, validation and immutable user role", async () => {
     400,
   );
 });
-test("concurrent identical creates persist exactly one post and message", async () => {
-  const key = randomUUID();
-  const body = { content };
-  const results = await Promise.all(
-    Array.from({ length: 8 }, async () =>
-      json(await request("/api/v1/posts", "POST", body, key), 201),
-    ),
-  );
-  for (const result of results) assert.deepEqual(result, results[0]);
-  const detail = await json(
-    await request("/api/v1/posts/" + results[0].post.id),
-    200,
-  );
-  assert.equal(detail.messages.length, 1);
-  assert.equal(detail.messages[0].turn_id, results[0].message.turn_id);
+test("post creation requires a client UUIDv7 and no receipt table remains", async () => {
+  const missing = await app.request("/api/v1/posts", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + c.API_TOKEN,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ content }),
+  });
+  await json(missing, 422);
   await json(
-    await request("/api/v1/posts", "POST", { title: "changed", content }, key),
+    await request("/api/v1/posts", "POST", { id: randomUUID(), content }),
+    422,
+  );
+  const table = await pool.query(
+    "select to_regclass('public.idempotency') as name",
+  );
+  assert.equal(table.rows[0].name, null);
+});
+test("concurrent duplicate UUIDv7 creates return one success and conflicts", async () => {
+  const id = uuidv7();
+  const body = { content };
+  const responses = await Promise.all(
+    Array.from({ length: 8 }, () => request("/api/v1/posts", "POST", body, id)),
+  );
+  assert.equal(responses.filter((r) => r.status === 201).length, 1);
+  assert.equal(responses.filter((r) => r.status === 409).length, 7);
+  const result = await json(
+    responses.find((r) => r.status === 201)!,
+    201,
+  );
+  assert.equal(result.post.id, id);
+  const detail = await json(await request("/api/v1/posts/" + id), 200);
+  assert.equal(detail.messages.length, 1);
+  assert.equal(detail.messages[0].turn_id, result.message.turn_id);
+  const conflict = await json(
+    await request("/api/v1/posts", "POST", { title: "changed", content }, id),
     409,
   );
+  assert.equal(conflict.error.code, "POST_ALREADY_EXISTS");
+  assert.deepEqual(
+    (await json(await request("/api/v1/posts/" + id), 200)).messages,
+    detail.messages,
+  );
 });
-test("failed image binding rolls back post, message and idempotency receipt", async () => {
+test("failed image binding rolls back post and message; same UUID can retry", async () => {
   const [{ n: beforeCount }] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(posts);
-  const key = randomUUID();
+  const id = uuidv7();
   const bad = {
     content: { parts: [{ type: "image", image_id: randomUUID() }] },
   };
-  await json(await request("/api/v1/posts", "POST", bad, key), 409);
+  await json(await request("/api/v1/posts", "POST", bad, id), 409);
   const [{ n: afterCount }] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(posts);
   assert.equal(afterCount, beforeCount);
-  await json(await request("/api/v1/posts", "POST", { content }, key), 201);
+  await json(await request("/api/v1/posts", "POST", { content }, id), 201);
 });
 test("database rejects message UPDATE; assistant/tool messages retain same turn", async () => {
   const result = await json(
@@ -199,9 +225,9 @@ test("database rejects message UPDATE; assistant/tool messages retain same turn"
   );
 });
 test("rename changes only post, pagination has no duplicates, delete is idempotent", async () => {
-  const key = randomUUID();
+  const id = uuidv7();
   const created = await json(
-    await request("/api/v1/posts", "POST", { content }, key),
+    await request("/api/v1/posts", "POST", { content }, id),
     201,
   );
   await json(
@@ -241,7 +267,7 @@ test("rename changes only post, pagination has no duplicates, delete is idempote
     204,
   );
   await json(await request("/api/v1/posts/" + created.post.id), 404);
-  await json(await request("/api/v1/posts", "POST", { content }, key), 410);
+  await json(await request("/api/v1/posts", "POST", { content }, id), 201);
 });
 /**
  * 通过 API 申请上传地址并 PUT 指定图片字节，返回上传申请结果。

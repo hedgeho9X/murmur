@@ -193,6 +193,11 @@
       "CreatePostRequest": {
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "客户端创建草稿时生成并保存的 UUIDv7，重试复用；重复创建返回 409。"
+          },
           "title": {
             "type": "string",
             "nullable": true,
@@ -204,6 +209,7 @@
           }
         },
         "required": [
+          "id",
           "content"
         ],
         "additionalProperties": false
@@ -615,19 +621,6 @@
             "bearerAuth": []
           }
         ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 8,
-              "maxLength": 128,
-              "pattern": "^[A-Za-z0-9_-]+$"
-            },
-            "required": true,
-            "name": "Idempotency-Key",
-            "in": "header"
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -680,16 +673,6 @@
             }
           },
           "409": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "410": {
             "description": "Error",
             "content": {
               "application/json": {
@@ -824,16 +807,6 @@
               }
             }
           },
-          "410": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "413": {
             "description": "Error",
             "content": {
@@ -941,16 +914,6 @@
             }
           },
           "409": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "410": {
             "description": "Error",
             "content": {
               "application/json": {
@@ -1084,16 +1047,6 @@
               }
             }
           },
-          "410": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "413": {
             "description": "Error",
             "content": {
@@ -1201,16 +1154,6 @@
               }
             }
           },
-          "410": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "413": {
             "description": "Error",
             "content": {
@@ -1265,19 +1208,6 @@
             "bearerAuth": []
           }
         ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 8,
-              "maxLength": 128,
-              "pattern": "^[A-Za-z0-9_-]+$"
-            },
-            "required": true,
-            "name": "Idempotency-Key",
-            "in": "header"
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1330,16 +1260,6 @@
             }
           },
           "409": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "410": {
             "description": "Error",
             "content": {
               "application/json": {
@@ -1465,16 +1385,6 @@
               }
             }
           },
-          "410": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "413": {
             "description": "Error",
             "content": {
@@ -1582,16 +1492,6 @@
             }
           },
           "409": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "410": {
             "description": "Error",
             "content": {
               "application/json": {

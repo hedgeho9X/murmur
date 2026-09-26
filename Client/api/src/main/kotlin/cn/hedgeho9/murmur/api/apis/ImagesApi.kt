@@ -24,7 +24,6 @@ interface ImagesApi {
      *  - 401: Error
      *  - 404: Error
      *  - 409: Error
-     *  - 410: Error
      *  - 413: Error
      *  - 422: Error
      *  - 500: Error
@@ -46,18 +45,16 @@ interface ImagesApi {
      *  - 401: Error
      *  - 404: Error
      *  - 409: Error
-     *  - 410: Error
      *  - 413: Error
      *  - 422: Error
      *  - 500: Error
      *  - 503: Error
      *
-     * @param idempotencyKey 
      * @param uploadRequest 
      * @return [UploadResponse]
      */
     @POST("api/v1/images/uploads")
-    suspend fun createImageUpload(@Header("Idempotency-Key") idempotencyKey: kotlin.String, @Body uploadRequest: UploadRequest): Response<UploadResponse>
+    suspend fun createImageUpload(@Body uploadRequest: UploadRequest): Response<UploadResponse>
 
     /**
      * GET api/v1/images/{id}/url
@@ -69,7 +66,6 @@ interface ImagesApi {
      *  - 401: Error
      *  - 404: Error
      *  - 409: Error
-     *  - 410: Error
      *  - 413: Error
      *  - 422: Error
      *  - 500: Error

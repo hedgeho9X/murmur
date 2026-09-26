@@ -24,12 +24,17 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
+ * @param id 客户端创建草稿时生成并保存的 UUIDv7，重试复用；重复创建返回 409。
  * @param content 
  * @param title 
  */
 @Serializable
 
 data class CreatePostRequest (
+
+    /* 客户端创建草稿时生成并保存的 UUIDv7，重试复用；重复创建返回 409。 */
+    @Contextual @SerialName(value = "id")
+    val id: java.util.UUID,
 
     @SerialName(value = "content")
     val content: UserContent,

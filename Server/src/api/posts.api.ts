@@ -3,10 +3,9 @@
  */
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import * as C from "../modules/posts/posts.contracts.js";
-import { KeyHeader } from "../common/contracts.js";
 import type { PostsService } from "../modules/posts/posts.service.js";
 import { json, errors, security, params } from "./api.shared.js";
-/** 创建帖子和首条用户消息的 OpenAPI 契约，包含幂等请求头与响应结构。 */
+/** 创建帖子和首条用户消息的 OpenAPI 契约，要求客户端提供 UUIDv7。 */
 const createPostRoute = createRoute({
   method: "post",
   path: "/api/v1/posts",
@@ -14,7 +13,6 @@ const createPostRoute = createRoute({
   tags: ["Posts"],
   security,
   request: {
-    headers: KeyHeader,
     body: {
       required: true,
       content: { "application/json": { schema: C.CreatePost } },
@@ -108,18 +106,10 @@ const deletePostRoute = createRoute({
 export function registerPostsApi(app: OpenAPIHono, service: PostsService) {
   /**
    * POST /api/v1/posts
-   * 创建帖子及首条用户消息，返回幂等创建结果。
+   * 创建帖子及首条用户消息，重复帖子 ID 返回 409。
    */
   app.openapi(createPostRoute, async (c) =>
-    c.json(
-      C.CreatedPost.parse(
-        await service.create(
-          c.req.valid("json"),
-          c.req.valid("header")["Idempotency-Key"],
-        ),
-      ),
-      201,
-    ),
+    c.json(C.CreatedPost.parse(await service.create(c.req.valid("json"))), 201),
   );
   /**
    * GET /api/v1/posts

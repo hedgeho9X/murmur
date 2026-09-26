@@ -62,16 +62,14 @@ Configure bearerAuth:
 val apiClient = ApiClient()
 apiClient.setBearerToken("TOKEN")
 val webService = apiClient.createWebservice(ImagesApi::class.java)
-val idempotencyKey : kotlin.String = idempotencyKey_example // kotlin.String | 
 val uploadRequest : UploadRequest =  // UploadRequest | 
 
 launch(Dispatchers.IO) {
-    val result : UploadResponse = webService.createImageUpload(idempotencyKey, uploadRequest)
+    val result : UploadResponse = webService.createImageUpload(uploadRequest)
 }
 ```
 
 ### Parameters
-| **idempotencyKey** | **kotlin.String**|  | |
 | Name | Type | Description  | Notes |
 | ------------- | ------------- | ------------- | ------------- |
 | **uploadRequest** | [**UploadRequest**](UploadRequest.md)|  | |

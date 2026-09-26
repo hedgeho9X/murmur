@@ -19,6 +19,12 @@ export const Post = z
   .openapi("Post");
 export const CreatePost = z
   .object({
+    id: z
+      .uuid({ version: "v7" })
+      .openapi({
+        description:
+          "客户端创建草稿时生成并保存的 UUIDv7，重试复用；重复创建返回 409。",
+      }),
     title: z.string().trim().min(1).max(200).nullable().optional(),
     content: UserContent,
   })
@@ -30,5 +36,5 @@ export const CreatedPost = z
 export const PostDetail = z
   .object({ post: Post, messages: z.array(Message) })
   .openapi("PostDetail");
-/** 通过创建契约校验的帖子输入；ID、角色、时间和轮次由服务端生成。 */
+/** 通过创建契约校验的帖子输入；帖子 ID 由客户端提供，消息角色、时间和轮次由服务端生成。 */
 export type NewPost = z.infer<typeof CreatePost>;

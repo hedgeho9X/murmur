@@ -12,7 +12,7 @@ import type { NewPost } from "./posts.contracts.js";
  */
 export type PostCursor = { t: string; id: string };
 /**
- * 执行帖子相关 SQL，创建操作使用上层传入的事务以保证跨模块原子性。
+ * 执行帖子相关 SQL，创建操作开启事务，并将事务传给附件绑定回调。
  */
 export class PostsRepository {
   /**
@@ -20,25 +20,33 @@ export class PostsRepository {
    */
   constructor(private readonly db: DB) {}
   /**
-   * 在传入事务中插入帖子及第一条用户消息，分配消息 ID 与轮次 ID，返回插入结果。
-   * 不自行提交事务，图片绑定和幂等回执由调用方在同一事务中完成。
+   * 使用客户端帖子 ID 创建帖子和首条消息，分配消息与轮次 ID，返回插入结果。
+   * 帖子 ID 冲突时返回 undefined；附件回调共享事务，失败则全部回滚。
    */
-  async create(tx: Tx, input: NewPost) {
-    const [post] = await tx
-      .insert(posts)
-      .values({ id: randomUUID(), title: input.title ?? null })
-      .returning();
-    const [message] = await tx
-      .insert(messages)
-      .values({
-        id: randomUUID(),
-        post_id: post.id,
-        turn_id: randomUUID(),
-        role: "user",
-        content: input.content,
-      })
-      .returning();
-    return { post, message };
+  async create(
+    input: NewPost,
+    attach: (tx: Tx, messageId: string) => Promise<void>,
+  ) {
+    return this.db.transaction(async (tx) => {
+      const [post] = await tx
+        .insert(posts)
+        .values({ id: input.id, title: input.title ?? null })
+        .onConflictDoNothing({ target: posts.id })
+        .returning();
+      if (!post) return undefined;
+      const [message] = await tx
+        .insert(messages)
+        .values({
+          id: randomUUID(),
+          post_id: post.id,
+          turn_id: randomUUID(),
+          role: "user",
+          content: input.content,
+        })
+        .returning();
+      await attach(tx, message.id);
+      return { post, message };
+    });
   }
   /**
    * 按帖子 ID 在同一只读快照中读取帖子及按时间、ID 排列的消息。
@@ -88,7 +96,7 @@ export class PostsRepository {
   }
   /**
    * 按 ID 删除帖子，依赖外键级联删除消息和图片元数据。
-   * 数据库触发器同时记录对象清理任务、清除回执正文；不存在时无操作。
+   * 数据库触发器同时记录对象清理任务；不存在时无操作。
    */
   async delete(id: string) {
     await this.db.delete(posts).where(eq(posts.id, id));
