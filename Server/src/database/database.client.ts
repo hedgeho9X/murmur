@@ -4,7 +4,7 @@
  */
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import * as schema from "./database.schema.js";
+import * as schema from "./schemas/index.js";
 /**
  * 根据连接地址创建连接池和带表定义的 Drizzle 客户端，返回二者供服务复用。
  * 调用方必须在关闭进程或测试结束时调用 pool.end() 释放连接。

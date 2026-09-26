@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import type { DB, Tx } from "../../database/database.client.js";
-import { images, objectCleanup } from "../../database/database.schema.js";
+import { images, objectCleanup } from "../../database/schemas/index.js";
 /**
  * 图片持久化记录，包含服务端对象键和归属信息；不直接作为公开响应。
  */

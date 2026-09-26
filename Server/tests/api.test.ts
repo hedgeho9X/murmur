@@ -20,7 +20,7 @@ import {
   messages,
   images,
   objectCleanup,
-} from "../src/database/database.schema.js";
+} from "../src/database/schemas/index.js";
 import { Message } from "../src/modules/messages/messages.contracts.js";
 const c = config();
 const admin = connect(c.DATABASE_URL);

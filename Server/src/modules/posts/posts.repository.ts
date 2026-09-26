@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { eq, sql, desc } from "drizzle-orm";
 import type { DB, Tx } from "../../database/database.client.js";
-import { posts, messages } from "../../database/database.schema.js";
+import { posts, messages } from "../../database/schemas/index.js";
 import type { NewPost } from "./posts.contracts.js";
 /**
  * 已解码的帖子分页边界，包含创建时间和 ID；不包含 HTTP 游标编码逻辑。

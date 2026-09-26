@@ -73,4 +73,4 @@ npm run storage:cleanup # 手动执行一次可重试清理；API 也会每分�
 
 ## 源码入口
 
-HTTP 路由位于 `src/api/`；业务模块位于 `src/modules/<模块名>/`。文件采用 `模块名.职责.ts`，例如 `posts.service.ts` 与 `posts.repository.ts`。数据库连接和表定义在 `src/database/`。具体分层见 [设计说明](docs/design.md#目录与职责)。
+HTTP 路由位于 `src/api/`；业务模块位于 `src/modules/<模块名>/`。文件采用 `模块名.职责.ts`，例如 `posts.service.ts` 与 `posts.repository.ts`。数据库连接在 `src/database/database.client.ts`；表定义按模块放在 `src/database/schemas/*.schema.ts`，由 `index.ts` 统一导出。具体分层见 [设计说明](docs/design.md#目录与职责)。

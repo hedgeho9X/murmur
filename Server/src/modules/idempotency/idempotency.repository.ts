@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto";
 import { eq, and, sql } from "drizzle-orm";
 import type { DB, Tx } from "../../database/database.client.js";
-import { posts, images, idempotency } from "../../database/database.schema.js";
+import { posts, images, idempotency } from "../../database/schemas/index.js";
 import { ApiError } from "../../common/errors.js";
 import { wire } from "../../common/serialization.js";
 /**

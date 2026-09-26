@@ -52,7 +52,7 @@ Hono Zod route → OpenAPI 3.0.3 → Scalar + 固定版本 OpenAPI Generator →
 - `src/modules/messages/messages.contracts.ts`：消息与内容块契约；尚无独立消息写入 API，不创建空 service/repository。
 - `src/modules/idempotency/idempotency.repository.ts`：可跨模块使用的幂等事务与响应回执。
 - `src/modules/modules.ts`：实例装配，向 HTTP 层注入服务。
-- `src/database/`：数据库连接与 Drizzle 表定义；SQL 迁移继续在根 migrations/。
+- `src/database/database.client.ts`：数据库连接；`src/database/schemas/` 按 posts、messages、images、idempotency 模块拆分表定义，`index.ts` 统一导出，图片清理队列与图片表同文件。跨表外键直接引用目标 schema 文件，不通过汇总入口。SQL 迁移继续在根 migrations/。
 - `src/common/`：通用 ID/错误契约、异常和序列化帮助函数。
 
 调用链：api → service → repository → PostgreSQL；图片 service 另调用 images.storage → S3。
