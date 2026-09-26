@@ -61,20 +61,6 @@ function render() {
   if (draft.images.length) $("capture-photo").src = draft.images[0];
   $("photo-count").hidden = !draft.images.length || phase === "recording";
   $("photo-count").textContent = `${draft.images.length} 张照片`;
-  $("heading").textContent =
-    phase === "recording"
-      ? "把想法，说给此刻。"
-      : phase === "photo"
-        ? "给这一刻，加点想法。"
-        : "有什么想记下来的？";
-  $("mode-label").textContent =
-    phase === "recording"
-      ? "模拟转写 · 仅显示末尾 36 字"
-      : phase === "photo"
-        ? "照片已留在草稿里"
-        : "看见什么，就记下什么";
-  $("view-label").textContent =
-    phase === "photo" ? "已拍摄" : stream ? "实时取景" : "演示取景";
   $("enable-camera").hidden = phase !== "capture" || !!stream;
   $("draft-dot").hidden = !draft.text && !draft.images.length;
 }
@@ -232,7 +218,6 @@ function closeEditor() {
 }
 /** 更新字数和发送可用性，不改变正文。 */
 function updateEditor() {
-  $("char-count").textContent = `${Array.from(draft.text).length} 字`;
   $("send").disabled = !draft.text.trim() && !draft.images.length;
 }
 /** 展示附件缩略图，移除操作同步保存草稿。 */
