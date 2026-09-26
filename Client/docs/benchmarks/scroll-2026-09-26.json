@@ -1,0 +1,29 @@
+{
+  "device": "Xiaomi 23127PN0CC",
+  "method": "adb gfxinfo reset; 3 pairs of up/down 350ms gestures on existing notes; optimized runs after one warm-up pair",
+  "frame_interval_ms": 8.31,
+  "limitations": "Short manual comparison, not a Macrobenchmark suite. Modern and legacy jank counters use different definitions. No note contents retained.",
+  "results": {
+    "debug": {
+      "frames": 522.0,
+      "p95_ms": 12.0,
+      "p99_ms": 19.0,
+      "jank_percent": 0.19,
+      "legacy_jank_percent": 14.94
+    },
+    "optimized": {
+      "frames": 488.0,
+      "p95_ms": 6.0,
+      "p99_ms": 11.0,
+      "jank_percent": 0.2,
+      "legacy_jank_percent": 0.82
+    },
+    "optimized_repeat": {
+      "frames": 564.0,
+      "p95_ms": 7.0,
+      "p99_ms": 12.0,
+      "jank_percent": 0.18,
+      "legacy_jank_percent": 1.42
+    }
+  }
+}

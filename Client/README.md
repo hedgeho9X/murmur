@@ -66,3 +66,5 @@ python3 Client/scripts/dev-install.py --serial 设备序列号 --skip-build # �
 默认通过 adb reverse 使用 USB 连接 API；S3 签名地址仍由后端 S3_PUBLIC_ENDPOINT 决定。当前局域网配置可以继续使用，纯 USB 模式则设为 localhost:59000 并重启后端。也可传 --url 指定可达地址。
 
 无线调试需要 Android 11+：在手机无线调试中选择配对码配对，电脑执行 adb pair 后再 adb connect；两者端口可能不同。配对后复用同一安装脚本。首次授权/配对仍需在手机确认。
+
+日常手机体验默认安装启用 R8 的 `performance` 包；脚本先用同签名 debug 包完成一次性私有配置，再覆盖优化包，保留草稿和令牌。需要调试器时传 `--debug`。`--skip-build` 默认要求两种 APK 都已构建。性能对照见 [scroll-performance.md](docs/scroll-performance.md)。

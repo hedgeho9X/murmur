@@ -20,6 +20,18 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    buildTypes {
+        create("performance") {
+            initWith(getByName("release"))
+            // 与本地调试包使用同一签名和数据目录，便于在同一设备对照性能。
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            matchingFallbacks += listOf("release")
+        }
+    }
     buildFeatures {
         compose = true
         buildConfig = true
