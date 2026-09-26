@@ -11,3 +11,7 @@ API 契约源位于 `../Server/openapi/openapi.json`。在 `Server/` 运行 `npm
 在 `Server/` 启动本地 API 后运行 `npm run test:kotlin`，脚本会把后端测试凭据通过环境传给 Gradle，不把密钥写入客户端文件。
 
 API 模块使用 `cn.hedgeho9.murmur.api` 包名，Gradle 项目名为 `murmur-api`。Android 的界面、状态管理、认证与重试策略由后续手写模块负责。
+
+## HTML 交互原型
+
+[prototype/](prototype/README.md) 提供记录流程的独立浏览器原型，包含拍照、长按进入模拟录音、草稿编辑与本地记录。它不连接 ASR 或业务后端，不替代后续 Kotlin App。

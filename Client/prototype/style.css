@@ -1,0 +1,605 @@
+/** 手机记录原型的布局与状态样式；使用系统字体，不依赖外部资源。 */
+:root {
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+  color: #252d29;
+  background: #e7e8e1;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible {
+  outline: 3px solid #94ad92;
+  outline-offset: 4px;
+}
+button {
+  border: 0;
+}
+svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+button[hidden],
+[hidden] {
+  display: none !important;
+}
+.phone {
+  max-width: 440px;
+  min-height: 100dvh;
+  margin: auto;
+  background: #f5f4ef;
+  position: relative;
+  overflow: hidden;
+  padding: 24px 26px max(24px, env(safe-area-inset-bottom));
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 42px;
+}
+.brand {
+  font-family: Georgia, serif;
+  font-size: 29px;
+  letter-spacing: -1.8px;
+}
+.brand-dot {
+  color: #7e9871;
+}
+.icon-button {
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: #535c55;
+  flex-shrink: 0;
+  position: relative;
+}
+#draft-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #6b8961;
+  border-radius: 50%;
+  right: 7px;
+  top: 6px;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.8px;
+  color: #93978a;
+}
+h1 {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.8px;
+  margin: 12px 0 25px;
+}
+.viewfinder {
+  width: 100%;
+  aspect-ratio: 1;
+  position: relative;
+  border-radius: 30px;
+  overflow: hidden;
+  background: #dddcd0;
+  isolation: isolate;
+}
+.viewfinder > img,
+.viewfinder > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 0.65s,
+    transform 0.8s;
+}
+.view-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #232e2726, transparent 35%, #232e270d);
+  pointer-events: none;
+}
+.view-label {
+  position: absolute;
+  top: 19px;
+  left: 21px;
+  color: #fffdf1;
+  letter-spacing: 1px;
+  font-size: 10px;
+}
+.corner {
+  position: absolute;
+  width: 19px;
+  height: 19px;
+  border-color: #ffffff80;
+  border-style: solid;
+}
+.tl {
+  top: 48px;
+  left: 20px;
+  border-width: 1px 0 0 1px;
+}
+.tr {
+  top: 48px;
+  right: 20px;
+  border-width: 1px 1px 0 0;
+}
+.bl {
+  bottom: 20px;
+  left: 20px;
+  border-width: 0 0 1px 1px;
+}
+.br {
+  bottom: 20px;
+  right: 20px;
+  border-width: 0 1px 1px 0;
+}
+#photo-count {
+  position: absolute;
+  bottom: 19px;
+  right: 19px;
+  font-size: 10px;
+  border-radius: 20px;
+  color: white;
+  background: #263c2a80;
+  padding: 7px 12px;
+}
+.capture-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+  font-size: 10px;
+  color: #999c90;
+  gap: 5px;
+}
+.capture-meta button {
+  font-size: 10px;
+  color: #737d69;
+  background: none;
+  padding: 7px 0;
+}
+.controls {
+  text-align: center;
+  margin-top: 38px;
+  min-height: 155px;
+}
+.controls p {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: #858b80;
+  margin-top: 18px;
+}
+.controls p span {
+  margin: 0 9px;
+  color: #b0b4a7;
+}
+.shutter {
+  border-radius: 50%;
+  width: 77px;
+  height: 77px;
+  border: 1px solid #8d9786;
+  background: transparent;
+  padding: 7px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.shutter span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #354c3d;
+  border-radius: 50%;
+  transition: transform 0.18s;
+}
+.shutter:active span {
+  transform: scale(0.91);
+}
+.button-pair {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+}
+.record-button,
+.edit-button,
+.stop-button {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+.record-button {
+  background: #f0e4df;
+  border: 1px solid #e2c7bd;
+}
+.record-button span {
+  background: #c86753;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+.edit-button {
+  background: #e7ebe1;
+  color: #465e49;
+  border: 1px solid #d6ddcf;
+}
+.stop-button {
+  background: #c86753;
+  box-shadow: 0 0 0 7px #c8675310;
+}
+.stop-button span {
+  background: #fff7ee;
+  width: 21px;
+  height: 21px;
+  border-radius: 5px;
+}
+.text-button {
+  background: none;
+  color: #909687;
+  font-size: 10px;
+  padding: 8px;
+}
+.viewfinder.recording > img,
+.viewfinder.recording > video {
+  opacity: 0;
+  transform: scale(1.035);
+}
+.viewfinder.recording {
+  background: #e8eadf;
+}
+.recording .view-shade,
+.recording .corner,
+.recording .view-label {
+  opacity: 0;
+}
+#recording-panel {
+  position: absolute;
+  inset: 0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.record-top {
+  display: flex;
+  justify-content: space-between;
+  color: #7d8974;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.record-top i {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: #c86753;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+.live-copy {
+  font-size: 24px;
+  line-height: 1.7;
+  color: #43553e;
+  min-height: 123px;
+  overflow-wrap: anywhere;
+  transition: opacity 0.5s;
+}
+.live-copy.silent {
+  opacity: 0;
+}
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 22px;
+  vertical-align: middle;
+  background: #86977b;
+  margin-left: 4px;
+}
+.wave {
+  display: flex;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.wave i {
+  width: 3px;
+  height: 4px;
+  border-radius: 3px;
+  background: #9aaa8a;
+  transition: height 0.15s;
+}
+.record-foot {
+  text-align: center;
+  font-size: 10px;
+  color: #9ca38e;
+  letter-spacing: 1px;
+}
+footer {
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: #a3a79b;
+  margin-top: 15px;
+}
+.demo-dot {
+  width: 4px;
+  height: 4px;
+  background: #a2ac94;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+}
+#flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: white;
+  opacity: 0;
+}
+#flash.flash {
+  animation: flash 0.3s;
+}
+@keyframes flash {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 0;
+  }
+}
+#scrim {
+  position: fixed;
+  inset: 0;
+  background: #14221860;
+  z-index: 5;
+  backdrop-filter: blur(3px);
+}
+.editor {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 440px);
+  background: #fffefb;
+  border-radius: 26px 26px 0 0;
+  z-index: 6;
+  padding: 10px 22px max(16px, env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 50px #14221812;
+  max-height: 90dvh;
+  overflow: auto;
+  animation: sheet 0.25s ease-out;
+}
+.sheet-handle {
+  height: 4px;
+  width: 32px;
+  border-radius: 3px;
+  background: #dddcd4;
+  margin: 0 auto 10px;
+}
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.editor-header h2 {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+}
+.editor-header > span {
+  font-size: 10px;
+  color: #a2a696;
+}
+.editor-header .icon-button {
+  font-size: 25px;
+  width: 32px;
+}
+.attachments {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.attachment {
+  position: relative;
+  flex-shrink: 0;
+}
+.attachment img {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.attachment button {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  border-radius: 50%;
+  background: #38463a;
+  color: white;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+}
+.editor textarea {
+  display: block;
+  border: 0;
+  background: none;
+  resize: none;
+  outline: none;
+  width: 100%;
+  height: 210px;
+  min-height: 90px;
+  font-size: 17px;
+  line-height: 1.85;
+  color: #39453b;
+  padding: 10px 0;
+}
+.editor textarea::placeholder {
+  color: #b0b3a7;
+}
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #eeeee7;
+  padding-top: 10px;
+  gap: 8px;
+}
+.editor-toolbar > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#char-count {
+  font-size: 10px;
+  color: #9b9f94;
+}
+#send {
+  padding: 13px 18px;
+  border-radius: 25px;
+  background: #3d5a43;
+  color: #fafbf4;
+  font-size: 12px;
+}
+#send span {
+  margin-left: 10px;
+}
+#send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+#toast {
+  position: fixed;
+  z-index: 10;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  background: #314937;
+  color: #fff;
+  border-radius: 20px;
+  font-size: 12px;
+  max-width: 90%;
+  text-align: center;
+  box-shadow: 0 4px 20px #0001;
+}
+.post {
+  padding: 22px 0;
+  border-bottom: 1px solid #dddfd5;
+}
+.post time {
+  font-size: 10px;
+  color: #929887;
+}
+.post p {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.post img {
+  width: 85px;
+  height: 85px;
+  border-radius: 14px;
+  object-fit: cover;
+  margin: 7px 7px 0 0;
+}
+.empty {
+  padding: 80px 0;
+  text-align: center;
+  color: #a1a895;
+  font-size: 13px;
+}
+.return-button {
+  display: block;
+  margin: 28px auto;
+  background: #3d5a43;
+  color: white;
+  padding: 14px 24px;
+  border-radius: 30px;
+}
+.local-note {
+  font-size: 10px;
+  color: #9b9f91;
+  text-align: center;
+}
+@keyframes sheet {
+  from {
+    transform: translate(-50%, 25px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+@media (min-width: 600px) {
+  body {
+    padding: 30px;
+  }
+  .phone {
+    min-height: 820px;
+    border-radius: 42px;
+    box-shadow: 0 16px 90px #293b2917;
+    padding-top: 30px;
+  }
+  .editor {
+    bottom: 20px;
+    border-radius: 26px;
+  }
+}
+@media (max-height: 700px) {
+  header {
+    margin-bottom: 20px;
+  }
+  .controls {
+    margin-top: 24px;
+    min-height: 130px;
+  }
+  .intro h1 {
+    margin-bottom: 16px;
+  }
+  .editor textarea {
+    height: 150px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

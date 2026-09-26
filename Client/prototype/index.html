@@ -1,0 +1,145 @@
+<!doctype html>
+<!-- Murmur 的独立交互原型：呈现取景、录音演示和草稿编辑，不连接业务后端。 -->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f5f4ef" />
+    <title>Murmur · 随手一念</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="phone">
+      <header>
+        <button id="history" class="icon-button" aria-label="查看记录">
+          <svg viewBox="0 0 24 24">
+            <path d="M5 5h14M5 12h10M5 19h14" />
+          </svg></button
+        ><span class="brand">murmur<span class="brand-dot">.</span></span
+        ><button id="resume" class="icon-button" aria-label="打开草稿">
+          <svg viewBox="0 0 24 24">
+            <path d="M14 5H5v15h15v-9M12 13l1-4 7-7 3 3-7 7-4 1Z" /></svg
+          ><span id="draft-dot" hidden></span>
+        </button>
+      </header>
+      <section id="capture-view">
+        <div class="intro">
+          <span class="eyebrow">留住此刻，也留一点想法</span>
+          <h1 id="heading">有什么想记下来的？</h1>
+        </div>
+        <div id="viewfinder" class="viewfinder">
+          <img id="scene" src="scene.svg" alt="演示取景：窗边的书与绿植" />
+          <video id="camera" autoplay playsinline muted hidden></video>
+          <img id="capture-photo" alt="已拍摄的照片" hidden />
+          <div class="view-shade"></div>
+          <span class="view-label" id="view-label">演示取景</span>
+          <span class="corner tl"></span><span class="corner tr"></span
+          ><span class="corner bl"></span><span class="corner br"></span>
+          <div id="recording-panel" hidden>
+            <div class="record-top">
+              <span><i></i> 正在记录</span><time id="timer">00:00</time>
+            </div>
+            <div class="live-copy">
+              <span id="live-text" aria-live="polite"></span
+              ><span class="cursor"></span>
+            </div>
+            <div class="wave" id="wave" aria-hidden="true"></div>
+            <span class="record-foot">慢慢说，停顿也没关系</span>
+          </div>
+          <span id="photo-count" hidden>1 张照片</span><span id="flash"></span>
+        </div>
+        <div class="capture-meta">
+          <span id="mode-label">看见什么，就记下什么</span
+          ><button id="enable-camera">启用真实相机 ↗</button>
+        </div>
+        <div id="shutter-controls" class="controls">
+          <button
+            id="shutter"
+            class="shutter"
+            aria-label="点按拍照，长按直接录音"
+          >
+            <span></span>
+          </button>
+          <p>轻点拍照 <span>·</span> 长按直接说</p>
+        </div>
+        <div id="photo-controls" class="controls" hidden>
+          <div class="button-pair">
+            <button id="record" class="record-button" aria-label="开始录音">
+              <span></span></button
+            ><button id="edit" class="edit-button" aria-label="编辑文字">
+              <svg viewBox="0 0 24 24">
+                <path d="m4 16 12-12 4 4L8 20H4v-4ZM13 7l4 4" />
+              </svg>
+            </button>
+          </div>
+          <p>说两句 <span>或</span> 写下来</p>
+          <button id="retake" class="text-button">重新取景</button>
+        </div>
+        <div id="record-controls" class="controls" hidden>
+          <button id="stop" class="stop-button" aria-label="停止录音">
+            <span></span>
+          </button>
+          <p>点击结束，继续编辑</p>
+        </div>
+        <footer>
+          <span class="demo-dot"></span> 交互原型 · 语音转写为模拟演示
+        </footer>
+      </section>
+      <section id="history-view" hidden>
+        <div class="intro">
+          <span class="eyebrow">一些瞬间，一些想法</span>
+          <h1>我的记录</h1>
+        </div>
+        <div id="post-list"></div>
+        <button id="back-capture" class="return-button">＋ 记下此刻</button>
+        <p class="local-note">记录仅保存在此浏览器，未发送到后端。</p>
+      </section>
+      <div id="toast" role="status" hidden></div>
+      <div id="scrim" hidden></div>
+      <section
+        id="editor"
+        class="editor"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="editor-title"
+        hidden
+      >
+        <div class="sheet-handle"></div>
+        <div class="editor-header">
+          <h2 id="editor-title">此刻的想法</h2>
+          <span id="save-state">草稿已保存</span
+          ><button
+            id="close-editor"
+            class="icon-button"
+            aria-label="收起编辑器"
+          >
+            ×
+          </button>
+        </div>
+        <div id="attachments" class="attachments"></div>
+        <textarea
+          id="body"
+          placeholder="现在的想法是…"
+          aria-label="记录正文"
+        ></textarea>
+        <div class="editor-toolbar">
+          <div>
+            <button id="add-image" class="icon-button" aria-label="添加图片">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <path d="m4 17 5-5 4 4 3-3 5 5" />
+                <circle cx="15.5" cy="8.5" r="1.5" />
+              </svg></button
+            ><span id="char-count">0 字</span>
+          </div>
+          <button id="send">保存记录 <span>↗</span></button>
+        </div>
+      </section>
+      <input id="image-input" type="file" accept="image/*" multiple hidden />
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
