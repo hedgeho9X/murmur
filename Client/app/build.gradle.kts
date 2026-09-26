@@ -46,6 +46,7 @@ android {
 
 dependencies {
     implementation(project(":api"))
+    implementation("androidx.work:work-runtime-ktx:2.10.4")
     implementation("com.mikepenz:multiplatform-markdown-renderer:0.37.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.37.0")
     implementation("androidx.exifinterface:exifinterface:1.4.1")
@@ -66,4 +67,6 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.1.0")
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
 }

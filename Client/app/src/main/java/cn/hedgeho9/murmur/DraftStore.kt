@@ -45,6 +45,10 @@ fun newId(): String {
 
 /** 在应用私有目录中原子保存单份活跃草稿，连接令牌单独加密。 */
 class DraftStore(private val context: Context) {
+    companion object {
+        private val importLock = Any()
+    }
+
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -58,13 +62,15 @@ class DraftStore(private val context: Context) {
 
     /** 仅开发版读取已授权 ADB 写入的私有配置，加密保存后立即删除临时明文。 */
     private fun importDevelopmentConnection() {
-        val source = File(context.filesDir, "dev-connection.json")
-        if (!source.exists()) return
-        try {
-            val input = org.json.JSONObject(source.readText())
-            configure(input.getString("url"), input.getString("token"))
-        } finally {
-            source.delete()
+        synchronized(importLock) {
+            val source = File(context.filesDir, "dev-connection.json")
+            if (!source.exists()) return
+            try {
+                val input = org.json.JSONObject(source.readText())
+                configure(input.getString("url"), input.getString("token"))
+            } finally {
+                source.delete()
+            }
         }
     }
 
