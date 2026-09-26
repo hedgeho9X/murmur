@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -61,6 +62,7 @@ fun DraggablePhoto(
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val delete by rememberUpdatedState(onDelete)
+    var decoded by remember(path) { mutableStateOf(false) }
     var bounds by remember { mutableStateOf(Rect.Zero) }
     Box(
         Modifier.fillMaxSize()
@@ -106,9 +108,14 @@ fun DraggablePhoto(
                 File(path),
                 "草稿照片，长按拖动删除",
                 Modifier.fillMaxSize()
+                    .drawWithContent {
+                        drawContent()
+                        if (decoded) CaptureTiming.firstDraw(path)
+                    }
                     .clip(RoundedCornerShape(22.dp))
                     .clickable(onClick = onPreview),
                 contentScale = ContentScale.Crop,
+                onSuccess = { decoded = true },
             )
     }
 }

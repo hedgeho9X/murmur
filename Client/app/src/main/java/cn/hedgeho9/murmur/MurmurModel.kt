@@ -10,6 +10,7 @@ import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cn.hedgeho9.murmur.api.models.Post
+import coil.imageLoader
 import java.io.File
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -142,6 +143,62 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
     /** 导入图片到应用私有目录并转为有界 JPEG，避免临时 URI 权限失效。 */
     fun addPhoto(uri: Uri) {
         addPhotos(listOf(uri))
+    }
+
+    /** 相机 JPEG 原样进入私有草稿目录，保留像素与 EXIF；仅预览解码，不重编码原件。 */
+    fun addCapturedPhoto(file: File, shutterAt: Long) {
+        if (state.value.busy) return
+        change { it.copy(busy = true) }
+        viewModelScope.launch {
+            var oversized = false
+            try {
+                val path =
+                    withContext(Dispatchers.IO) {
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(file.absolutePath, bounds)
+                        android.util.Log.d(
+                            "MurmurCapture",
+                            "size=${bounds.outWidth}x${bounds.outHeight}",
+                        )
+                        check(bounds.outWidth > 0 && bounds.outHeight > 0)
+                        oversized =
+                            file.length() > 10 * 1024 * 1024 ||
+                                bounds.outWidth.toLong() * bounds.outHeight > 25_000_000
+                        val target = File(getApplication<Application>().filesDir, "${newId()}.jpg")
+                        if (!file.renameTo(target)) {
+                            file.copyTo(target)
+                            file.delete()
+                        }
+                        target.absolutePath
+                    }
+                run {
+                    CaptureTiming.track(path, shutterAt)
+                    val context = getApplication<Application>()
+                    val decoded =
+                        context.imageLoader.execute(
+                            coil.request.ImageRequest.Builder(context)
+                                .data(File(path))
+                                .size(context.resources.displayMetrics.widthPixels)
+                                .precision(coil.size.Precision.INEXACT)
+                                .build()
+                        )
+                    if (decoded is coil.request.ErrorResult) throw decoded.throwable
+                    val prepared = state.value.draft.copy(images = state.value.draft.images + path)
+                    withContext(Dispatchers.IO) { store.save(prepared) }
+                    change { it.copy(draft = prepared) }
+                    // 只记录耗时，照片内容和文件路径不进入日志。
+                    android.util.Log.d(
+                        "MurmurCapture",
+                        "draftReadyMs=${android.os.SystemClock.elapsedRealtime()-shutterAt}",
+                    )
+                }
+                if (oversized) error("原图已保留；照片超出服务器上传限制，未自动压缩")
+            } catch (_: Exception) {
+                error("照片保存失败")
+            } finally {
+                change { it.copy(busy = false) }
+            }
+        }
     }
 
     /** 顺序导入一组附件，导入期间锁定发送，避免图片落入下一份草稿。 */

@@ -3,7 +3,6 @@ package cn.hedgeho9.murmur
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -112,7 +111,12 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                 PackageManager.PERMISSION_GRANTED
         )
     }
-    val controller = remember { LifecycleCameraController(context) }
+    var capturePending by remember { mutableStateOf(false) }
+    val controller = remember {
+        LifecycleCameraController(context).apply {
+            setEnabledUseCases(androidx.camera.view.CameraController.IMAGE_CAPTURE)
+        }
+    }
     val cameraPermission =
         androidx.activity.compose.rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission()
@@ -311,15 +315,22 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                         .border(1.dp, Color(0xFF252525), CircleShape)
                                         .padding(5.dp)
                                         .background(Color(0xFF252525), CircleShape)
-                                        .pointerInput(cameraGranted, s.busy) {
+                                        .pointerInput(cameraGranted, s.busy, capturePending) {
                                             detectTapGestures(
-                                                onLongPress = { record() },
+                                                onLongPress = { if (!capturePending) record() },
                                                 onTap = {
                                                     if (!cameraGranted)
                                                         cameraPermission.launch(
                                                             Manifest.permission.CAMERA
                                                         )
-                                                    else if (!s.busy) {
+                                                    else if (!s.busy && !capturePending) {
+                                                        capturePending = true
+                                                        val shutterAt =
+                                                            android.os.SystemClock.elapsedRealtime()
+                                                        view.performHapticFeedback(
+                                                            android.view.HapticFeedbackConstants
+                                                                .CONFIRM
+                                                        )
                                                         val file =
                                                             File(
                                                                 context.cacheDir,
@@ -337,17 +348,21 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                                                     result:
                                                                         ImageCapture.OutputFileResults
                                                                 ) {
-                                                                    view.performHapticFeedback(
-                                                                        android.view
-                                                                            .HapticFeedbackConstants
-                                                                            .CONFIRM
+                                                                    capturePending = false
+                                                                    android.util.Log.d(
+                                                                        "MurmurCapture",
+                                                                        "jpegMs=${android.os.SystemClock.elapsedRealtime()-shutterAt}",
                                                                     )
-                                                                    vm.addPhoto(Uri.fromFile(file))
+                                                                    vm.addCapturedPhoto(
+                                                                        file,
+                                                                        shutterAt,
+                                                                    )
                                                                 }
 
                                                                 override fun onError(
                                                                     exception: ImageCaptureException
                                                                 ) {
+                                                                    capturePending = false
                                                                     vm.error("拍照失败")
                                                                 }
                                                             },
