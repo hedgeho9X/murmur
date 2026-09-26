@@ -18,8 +18,9 @@ let stream,
   started,
   baseline = "",
   finalText = "",
-  partialText = "",
-  lastChange = 0;
+  partialText = "";
+let visibleSpeech = "";
+const textMeasure = document.createElement("canvas").getContext("2d");
 let toastTimer,
   pressTimer,
   longPressed = false;
@@ -125,6 +126,17 @@ async function enableCamera() {
     toast("无法启用相机，仍可使用演示取景");
   }
 }
+/** 按可用像素宽度保留末尾文字，避免换行或裁掉最后一个字；不改变完整草稿。 */
+function renderTranscriptTail() {
+  const box = $("live-text").parentElement;
+  textMeasure.font = getComputedStyle(box).font;
+  const budget = Math.max(0, box.clientWidth - 16);
+  const chars = Array.from(visibleSpeech);
+  while (chars.length && textMeasure.measureText(chars.join("")).width > budget)
+    chars.shift();
+  $("live-text").textContent = chars.join("");
+}
+window.addEventListener("resize", renderTranscriptTail);
 /** 开始模拟流式识别；完整文本进入草稿，屏幕只展示尾部文字。 */
 function startRecording() {
   if (phase === "recording") return;
@@ -132,9 +144,11 @@ function startRecording() {
   finalText = "";
   partialText = "";
   started = Date.now();
-  lastChange = started;
   phase = "recording";
+  visibleSpeech = "";
   $("live-text").textContent = "";
+  $("live-text").parentElement.classList.add("silent");
+  $("wave").classList.add("silent");
   $("timer").textContent = "00:00";
   render();
   let segment = 0,
@@ -153,7 +167,6 @@ function startRecording() {
       position++;
       // partial 是整段候选的替换值，只有定稿后才追加，避免累计同一片段。
       partialText = text.slice(0, position);
-      lastChange = now;
       if (position >= text.length) {
         finalText += text;
         partialText = "";
@@ -167,14 +180,16 @@ function startRecording() {
         finalText +
         partialText;
       persist();
-      $("live-text").textContent = Array.from(finalText + partialText)
-        .slice(-36)
-        .join("");
+      visibleSpeech = finalText + partialText;
+      renderTranscriptTail();
     }
-    $("live-text").parentElement.classList.toggle(
-      "silent",
-      now - lastChange > 1600,
-    );
+    const silent = !speaking;
+    $("live-text").parentElement.classList.toggle("silent", silent);
+    $("wave").classList.toggle("silent", silent);
+    if (silent) {
+      visibleSpeech = "";
+      $("live-text").textContent = "";
+    }
     [...$("wave").children].forEach(
       (bar, i) =>
         (bar.style.height = `${speaking ? 5 + Math.abs(Math.sin(now / 190 + i * 0.65)) * 29 * (1 - Math.abs(i - 20) / 26) : 3}px`),
