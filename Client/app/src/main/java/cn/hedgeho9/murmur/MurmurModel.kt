@@ -15,6 +15,7 @@ import java.io.File
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 
 /** 客户端页面状态；录音临时状态不写入帖子数据库。 */
 data class UiState(
@@ -38,6 +39,8 @@ data class UiState(
     val selectedTags: List<String> = emptyList(),
     val posts: List<Post> = emptyList(),
     val cursor: String? = null,
+    val syncStates: Map<String, String> = emptyMap(),
+    val syncError: String? = null,
     val details: List<DisplayMessage> = emptyList(),
     val selected: String? = null,
     val error: String? = null,
@@ -48,12 +51,12 @@ data class UiState(
 /** 单用户应用状态，网络任务在协程中执行，失败保留原始草稿。 */
 class MurmurModel(application: Application) : AndroidViewModel(application) {
     private val store = DraftStore(application)
+    private val database = NotesDatabase.get(application)
+    private var localLimit = 40
     private val mutable = MutableStateFlow(UiState(base = store.baseUrl(), token = store.token()))
     val state = mutable.asStateFlow()
     private var speech: SpeechRecorder? = null
-    private var listJob: Job? = null
     private var detailJob: Job? = null
-    private var loadedQuery: String? = null
     private var tagJob: Job? = null
     private var silentJob: Job? = null
     private var finishJob: Job? = null
@@ -63,6 +66,58 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
             mutable.value = mutable.value.copy(draft = store.load())
         } catch (_: Exception) {
             mutable.value = mutable.value.copy(error = "草稿文件无法读取，请保留文件并检查存储")
+        }
+        viewModelScope.launch {
+            val oldScope =
+                java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(
+                        (state.value.base.trimEnd('/') + "\n" + state.value.token).toByteArray()
+                    )
+                    .joinToString("") { "%02x".format(it) }
+            withContext(Dispatchers.IO) { database.adoptConnectionScope(oldScope, scopeKey()) }
+            database.changes.collectLatest { refreshLocal() }
+        }
+        NotesSync.periodic(application)
+        NotesSync.schedule(application)
+    }
+
+    /** 当前数据分区只依赖连接身份，不存储明文凭据。 */
+    private fun scopeKey() = connectionScope(state.value.base)
+
+    /** 从 SQLite 更新显示；异步完成时重新核对连接，避免切换服务器串数据。 */
+    private suspend fun refreshLocal() {
+        val current = state.value
+        val scope = scopeKey()
+        val limit = localLimit
+        val rows = withContext(Dispatchers.IO) { database.list(scope, current.query, limit + 1) }
+        val status = withContext(Dispatchers.IO) { database.statuses(scope) }
+        val lastError = withContext(Dispatchers.IO) { database.syncStatus(scope) }
+        val detail =
+            current.selected?.let { withContext(Dispatchers.IO) { database.get(scope, it) } }
+        if (scope != scopeKey() || current.query != state.value.query || limit != localLimit) return
+        change {
+            it.copy(
+                posts = rows.take(limit),
+                cursor = if (rows.size > limit) "local:$limit" else null,
+                syncStates = status,
+                syncError = lastError,
+                details =
+                    if (it.page == "detail" && it.selected == current.selected && detail != null)
+                        detail.messages
+                    else it.details,
+                selectedTags =
+                    if (it.page == "detail" && it.selected == current.selected && detail != null)
+                        detail.post.tags
+                    else it.selectedTags,
+            )
+        }
+    }
+
+    /** 手动重试保留的离线操作，并触发一次远端刷新。 */
+    fun retrySync() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { database.retry(scopeKey()) }
+            NotesSync.schedule(getApplication(), immediate = true)
         }
     }
 
@@ -98,24 +153,30 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
         change { it.copy(editor = true, editingMessage = message, editingText = message.text) }
     }
 
-    /** 直接保存正文覆盖，不创建消息历史；失败时保留编辑内容。 */
+    /** 修改先写本地数据库与队列，立即返回详情，云端失败不丢失编辑。 */
     private fun savePublished() {
         val current = state.value
         val message = current.editingMessage ?: return
-        val postId = current.selected ?: return
+        val id = current.selected ?: return
         if (current.busy) return
         change { it.copy(busy = true) }
         viewModelScope.launch {
             try {
-                MurmurApi(current.base, current.token)
-                    .editMessage(postId, message.id, current.editingText)
+                withContext(Dispatchers.IO) {
+                    database.edit(
+                        connectionScope(current.base),
+                        id,
+                        message.id,
+                        current.editingText,
+                    )
+                }
                 change {
                     it.copy(editor = false, editingMessage = null, editingText = "", busy = false)
                 }
-                loadedQuery = null
-                open(postId)
+                refreshLocal()
+                NotesSync.schedule(getApplication())
             } catch (_: Exception) {
-                change { it.copy(busy = false, error = "保存失败，修改仍保留在编辑框中") }
+                change { it.copy(busy = false, error = "本地保存失败，修改仍保留在编辑框中") }
             }
         }
     }
@@ -134,7 +195,25 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
     fun settings(url: String, token: String) {
         try {
             store.configure(url, token)
-            change { it.copy(base = store.baseUrl(), token = token) }
+            detailJob?.cancel()
+            tagJob?.cancel()
+            change {
+                it.copy(
+                    base = store.baseUrl(),
+                    token = token,
+                    posts = emptyList(),
+                    details = emptyList(),
+                    cursor = null,
+                    selected = null,
+                    syncStates = emptyMap(),
+                    syncError = null,
+                    query = "",
+                    tagSuggestions = emptyList(),
+                    selectedTags = emptyList(),
+                )
+            }
+            viewModelScope.launch { refreshLocal() }
+            NotesSync.schedule(getApplication(), immediate = true)
         } catch (_: Exception) {
             error("请填写有效的 HTTP(S) 地址")
         }
@@ -387,36 +466,28 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
         if (state.value.recording) stop()
     }
 
-    /** 上传附件并创建帖子或追加消息，失败保留 ID 和已完成上传供用户重试。 */
+    /** 本地保存与队列提交成功后才清空草稿；不等待上传或远端创建。 */
     fun send() {
         if (state.value.editingMessage != null) {
             savePublished()
             return
         }
-        val d = state.value.draft
-        if (state.value.busy || state.value.finalizing || d.text.isBlank() && d.images.isEmpty())
-            return
+        val current = state.value
+        val d = current.draft
+        if (current.busy || current.finalizing || (d.text.isBlank() && d.images.isEmpty())) return
         change { it.copy(busy = true) }
         viewModelScope.launch {
             try {
-                val api = MurmurApi(state.value.base, state.value.token)
-                for (path in d.images) {
-                    if (state.value.draft.uploads[path] == null) {
-                        val id = api.upload(path)
-                        draft(
-                            state.value.draft.copy(
-                                uploads = state.value.draft.uploads + (path to id)
-                            )
-                        )
-                    }
+                val next = Draft()
+                withContext(Dispatchers.IO) {
+                    database.create(connectionScope(current.base), d)
+                    store.save(next)
                 }
-                val id = api.send(state.value.draft)
-                draft(Draft())
-                change { it.copy(editor = false, busy = false) }
-                loadedQuery = null
-                open(id)
+                change { it.copy(draft = next, editor = false, busy = false) }
+                open(d.postId ?: d.id)
+                NotesSync.schedule(getApplication())
             } catch (_: Exception) {
-                change { it.copy(busy = false, error = "保存失败，草稿已保留；请检查连接后重试") }
+                change { it.copy(busy = false, error = "本地保存失败，草稿未清除") }
             }
         }
     }
@@ -438,7 +509,24 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
             viewModelScope.launch {
                 delay(180)
                 try {
-                    val result = MurmurApi(state.value.base, state.value.token).suggestTags(prefix)
+                    val result =
+                        withContext(Dispatchers.IO) {
+                            database
+                                .list(scopeKey(), "", Int.MAX_VALUE)
+                                .flatMap { it.tags }
+                                .groupingBy { it }
+                                .eachCount()
+                                .filterKeys { it.startsWith(prefix.trim().lowercase()) }
+                                .entries
+                                .sortedWith(
+                                    compareByDescending<Map.Entry<String, Int>> { it.value }
+                                        .thenBy { it.key }
+                                )
+                                .take(12)
+                                .map {
+                                    cn.hedgeho9.murmur.api.models.TagSuggestion(it.key, it.value)
+                                }
+                        }
                     change { it.copy(tagSuggestions = result) }
                 } catch (e: CancellationException) {
                     throw e
@@ -455,55 +543,36 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
         history()
     }
 
-    /** 返回已加载列表时复用页面数据；首次进入才发起第一页请求。 */
+    /** 列表先从本地读取，后台独立刷新，不等待网络才能显示。 */
     fun showHistory() {
         detailJob?.cancel()
         change { it.copy(page = "history", detailLoading = false) }
-        if (loadedQuery == null && listJob?.isActive != true) history()
+        viewModelScope.launch { refreshLocal() }
+        NotesSync.schedule(getApplication())
     }
 
-    /** 查询或按 cursor 追加下一页；同一时间只允许一个分页请求。 */
+    /** 本地按页增加可见条目；重新查询同时请求一次后台同步。 */
     fun history(more: Boolean = false) {
-        if (more && (listJob?.isActive == true || state.value.cursor == null)) return
-        if (!more) listJob?.cancel()
-        detailJob?.cancel()
-        val query = if (more) loadedQuery ?: state.value.query else state.value.query
-        val cursor = if (more) state.value.cursor else null
+        if (more) localLimit += 40 else localLimit = 40
         change {
-            it.copy(
-                page = "history",
-                listLoading = true,
-                listError = false,
-                detailLoading = false,
-                posts = if (!more && loadedQuery != query) emptyList() else it.posts,
-                cursor = if (more) it.cursor else null,
-            )
+            it.copy(page = "history", listLoading = true, listError = false, detailLoading = false)
         }
-        listJob =
-            viewModelScope.launch {
-                try {
-                    val page = MurmurApi(state.value.base, state.value.token).list(cursor, query)
-                    loadedQuery = query
-                    change {
-                        it.copy(
-                            posts =
-                                if (more) (it.posts + page.items).distinctBy { p -> p.id }
-                                else page.items,
-                            cursor = page.nextCursor,
-                            listLoading = false,
-                        )
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Exception) {
-                    change { it.copy(listLoading = false, listError = true) }
-                }
+        viewModelScope.launch {
+            try {
+                refreshLocal()
+            } finally {
+                change { it.copy(listLoading = false) }
             }
+        }
+        if (!more) NotesSync.schedule(getApplication())
     }
 
-    /** 切换详情前清空上一帖；取消旧请求，避免迟到响应覆盖当前页面。 */
+    /** 详情优先使用完整本地缓存；缺失时取回并保存，不覆盖待同步修改。 */
     fun open(id: String) {
         detailJob?.cancel()
+        val scope = scopeKey()
+        val base = state.value.base
+        val token = state.value.token
         change {
             it.copy(
                 page = "detail",
@@ -516,18 +585,31 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
         detailJob =
             viewModelScope.launch {
                 try {
-                    val detail = MurmurApi(state.value.base, state.value.token).detail(id)
-                    change {
-                        it.copy(
-                            details = detail.messages,
-                            selectedTags = detail.post.tags,
-                            detailLoading = false,
-                        )
+                    val cached = withContext(Dispatchers.IO) { database.get(scope, id) }
+                    if (cached != null)
+                        change {
+                            it.copy(
+                                details = cached.messages,
+                                selectedTags = cached.post.tags,
+                                detailLoading = false,
+                            )
+                        }
+                    else {
+                        val detail = MurmurApi(base, token).detail(id)
+                        withContext(Dispatchers.IO) { database.cache(scope, detail.post, detail) }
+                        if (scope == scopeKey())
+                            change {
+                                it.copy(
+                                    details = detail.messages,
+                                    selectedTags = detail.post.tags,
+                                    detailLoading = false,
+                                )
+                            }
                     }
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
-                    change { it.copy(detailLoading = false, error = "帖子读取失败") }
+                } catch (e: Exception) {
+                    change { it.copy(detailLoading = false, error = "详情尚未缓存：${syncError(e)}") }
                 }
             }
     }
@@ -538,15 +620,17 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
         change { it.copy(page = "capture", detailLoading = false) }
     }
 
-    /** 删除当前帖子后回到列表，不删除其他草稿。 */
+    /** 删除先在本地隐藏并排队，网络失败时仍保留删除任务。 */
     fun delete() {
         val id = state.value.selected ?: return
+        val scope = scopeKey()
         viewModelScope.launch {
             try {
-                MurmurApi(state.value.base, state.value.token).delete(id)
-                history()
+                withContext(Dispatchers.IO) { database.delete(scope, id) }
+                showHistory()
+                NotesSync.schedule(getApplication())
             } catch (_: Exception) {
-                error("删除失败")
+                error("本地删除失败，请重试")
             }
         }
     }

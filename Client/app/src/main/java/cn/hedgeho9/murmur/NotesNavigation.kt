@@ -120,6 +120,24 @@ fun NotesList(s: UiState, vm: MurmurModel, padding: PaddingValues, listState: La
                     }
                 },
             )
+            s.syncError?.let {
+                Text(
+                    it,
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.clickable { vm.retrySync() }.padding(vertical = 6.dp),
+                )
+            }
+            if (s.syncStates.isNotEmpty())
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${s.syncStates.size} 条待同步",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = vm::retrySync) { Text("重试同步") }
+                }
             if (s.query.startsWith("#"))
                 TagSuggestions(s.tagSuggestions) {
                     keyboard?.hide()
@@ -148,6 +166,14 @@ fun NotesList(s: UiState, vm: MurmurModel, padding: PaddingValues, listState: La
                     .padding(16.dp)
             ) {
                 Text(date, color = Color.Gray, fontSize = 12.sp)
+                s.syncStates[post.id.toString()]?.let {
+                    Text(
+                        it,
+                        fontSize = 12.sp,
+                        color = if (it == "待同步") Color.Gray else Color(0xFFB34D43),
+                        maxLines = 3,
+                    )
+                }
                 TagRow(post.tags, vm::searchTag)
                 Spacer(Modifier.height(6.dp))
                 Text(

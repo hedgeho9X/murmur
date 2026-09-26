@@ -390,7 +390,12 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                             else
                                 key(s.selected) {
                                     LazyColumn(Modifier.weight(1f).padding(horizontal = 24.dp)) {
-                                        item { TagRow(s.selectedTags, vm::searchTag) }
+                                        item {
+                                            TagRow(s.selectedTags, vm::searchTag)
+                                            s.syncStates[s.selected]?.let {
+                                                TextButton(onClick = vm::retrySync) { Text(it) }
+                                            }
+                                        }
                                         items(s.details, key = { it.id }) { message ->
                                             var expanded by remember { mutableStateOf(false) }
                                             Column(
@@ -643,6 +648,8 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
         if (settings) {
             var url by remember { mutableStateOf(s.base) }
             var token by remember { mutableStateOf(s.token) }
+            var probing by remember { mutableStateOf(false) }
+            var probeResult by remember(url, token) { mutableStateOf<String?>(null) }
             AlertDialog(
                 onDismissRequest = { settings = false },
                 title = { Text("连接设置") },
@@ -662,6 +669,31 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                         )
+                        TextButton(
+                            enabled = !probing,
+                            onClick = {
+                                val testUrl = url
+                                val testToken = token
+                                probing = true
+                                scope.launch {
+                                    try {
+                                        val result =
+                                            try {
+                                                MurmurApi(testUrl, testToken).probe()
+                                            } catch (_: IllegalArgumentException) {
+                                                "服务器地址格式错误"
+                                            }
+                                        if (url == testUrl && token == testToken)
+                                            probeResult = result
+                                    } finally {
+                                        probing = false
+                                    }
+                                }
+                            },
+                        ) {
+                            Text(if (probing) "正在测试…" else "测试连接与延迟")
+                        }
+                        probeResult?.let { Text(it, fontSize = 13.sp) }
                     }
                 },
                 confirmButton = {

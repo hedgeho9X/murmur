@@ -68,3 +68,7 @@ python3 Client/scripts/dev-install.py --serial 设备序列号 --skip-build # �
 无线调试需要 Android 11+：在手机无线调试中选择配对码配对，电脑执行 adb pair 后再 adb connect；两者端口可能不同。配对后复用同一安装脚本。首次授权/配对仍需在手机确认。
 
 日常手机体验默认安装启用 R8 的 `performance` 包；脚本先用同签名 debug 包完成一次性私有配置，再覆盖优化包，保留草稿和令牌。需要调试器时传 `--debug`。`--skip-build` 默认要求两种 APK 都已构建。性能对照见 [scroll-performance.md](docs/scroll-performance.md)。
+
+## 离线笔记
+
+SQLite 保存笔记和发送队列，联网后由 WorkManager 重试；配置页支持连接、鉴权及延迟测试。详情见 [offline-sync.md](docs/offline-sync.md)。在线 ASR 暂保持现状。
