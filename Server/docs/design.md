@@ -40,3 +40,21 @@ complete 会持有图片行锁直到存储验证完成，这是单用户第一�
 
 Hono Zod route → OpenAPI 3.0.3 → Scalar + 固定版本 OpenAPI Generator → Kotlin Retrofit/coroutines/kotlinx.serialization。
 多态按 type/role discriminator 生成；任意 JSON 映射到 JsonElement，不能使用无法序列化的 Any。生成代码不手改。鉴权策略、重试决策和 Android 状态管理留给调用方。
+
+## 目录与职责
+
+采用按业务模块组织（feature-based modules）和点分隔职责命名（module.role.ts）。
+
+- `src/api/app.api.ts`：HTTP 中间件、错误响应、模块路由与 Scalar 装配。
+- `src/api/posts.api.ts`、`src/api/images.api.ts`：请求校验、调用 service、响应序列化。
+- `src/modules/posts/`：posts.contracts.ts、posts.service.ts、posts.repository.ts。
+- `src/modules/images/`：images.contracts.ts、images.service.ts、images.repository.ts、images.storage.ts、images.cleanup.ts。
+- `src/modules/messages/messages.contracts.ts`：消息与内容块契约；尚无独立消息写入 API，不创建空 service/repository。
+- `src/modules/idempotency/idempotency.repository.ts`：可跨模块使用的幂等事务与响应回执。
+- `src/modules/modules.ts`：实例装配，向 HTTP 层注入服务。
+- `src/database/`：数据库连接与 Drizzle 表定义；SQL 迁移继续在根 migrations/。
+- `src/common/`：通用 ID/错误契约、异常和序列化帮助函数。
+
+调用链：api → service → repository → PostgreSQL；图片 service 另调用 images.storage → S3。
+service 负责业务校验、流程与跨模块协作；repository 负责 SQL、行锁和一致性读取。创建帖子时各 repository 共享同一个幂等事务，不能各自开启独立事务。
+新增业务时在 modules/ 下建同名目录，在 api/ 下增加相应入口；只创建实际需要的职责文件。

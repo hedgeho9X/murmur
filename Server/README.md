@@ -74,3 +74,7 @@ npm run storage:cleanup # 手动执行一次可重试清理；API 也会每分�
 ## 目录迁移
 
 Docker Compose 项目名 `jerry-myapp`、数据库/bucket 名以及 Kotlin 包名暂时保持稳定，复用已有数据与调用方命名空间。旧目录 `/Users/jerry/Documents/ChatGPT/MyAPP` 仅为指向本目录的兼容符号链接，便于已有 Codex 任务继续工作。
+
+## 源码入口
+
+HTTP 路由位于 `src/api/`；业务模块位于 `src/modules/<模块名>/`。文件采用 `模块名.职责.ts`，例如 `posts.service.ts` 与 `posts.repository.ts`。数据库连接和表定义在 `src/database/`。具体分层见 [设计说明](docs/design.md#目录与职责)。

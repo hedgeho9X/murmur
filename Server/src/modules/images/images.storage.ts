@@ -8,8 +8,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import sharp from "sharp";
-import { config } from "./config.js";
-import { ApiError } from "./errors.js";
+import { config } from "../../config.js";
+import { ApiError } from "../../common/errors.js";
 /** Owns S3 clients and verifies temporary uploads before publishing immutable image objects. */
 export class Storage {
   readonly client: S3Client;

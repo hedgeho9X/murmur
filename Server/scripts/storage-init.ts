@@ -5,7 +5,7 @@ import {
   PutBucketLifecycleConfigurationCommand,
 } from "@aws-sdk/client-s3";
 import { config } from "../src/config.js";
-import { Storage } from "../src/storage.js";
+import { Storage } from "../src/modules/images/images.storage.js";
 const storage = new Storage(config());
 try {
   await storage.client.send(new HeadBucketCommand({ Bucket: storage.bucket }));

@@ -6,13 +6,19 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { eq, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { config } from "../src/config.js";
-import { connect } from "../src/db.js";
-import { createApp } from "../src/app.js";
-import { PostService } from "../src/service.js";
-import { Storage } from "../src/storage.js";
-import { cleanup } from "../src/cleanup.js";
-import { posts, messages, images, objectCleanup } from "../src/schema.js";
-import { Message } from "../src/contracts.js";
+import { connect } from "../src/database/database.client.js";
+import { createApp } from "../src/api/app.api.js";
+import { createServices } from "../src/modules/modules.js";
+import { ImagesRepository } from "../src/modules/images/images.repository.js";
+import { Storage } from "../src/modules/images/images.storage.js";
+import { cleanup } from "../src/modules/images/images.cleanup.js";
+import {
+  posts,
+  messages,
+  images,
+  objectCleanup,
+} from "../src/database/database.schema.js";
+import { Message } from "../src/modules/messages/messages.contracts.js";
 const c = config();
 const admin = connect(c.DATABASE_URL);
 const schema = "test_" + randomUUID().replaceAll("-", "");
@@ -20,7 +26,7 @@ const url = new URL(c.DATABASE_URL);
 url.pathname = "/" + schema;
 const { db, pool } = connect(url.toString());
 const storage = new Storage(c);
-const app = createApp(new PostService(db), storage, c.API_TOKEN);
+const app = createApp(createServices(db, storage), c.API_TOKEN);
 /** Sends a validated-style HTTP request through the actual Hono router. */
 function request(
   path: string,
@@ -53,7 +59,7 @@ after(async () => {
   try {
     await db.delete(posts);
     await db.delete(images);
-    await cleanup(db, storage);
+    await cleanup(new ImagesRepository(db), storage);
   } finally {
     await pool.end();
     await admin.pool.query(`DROP DATABASE ${schema}`);
@@ -319,13 +325,13 @@ test("real S3 upload, content verification, immutable final image and cascade cl
     throw Error("simulated storage outage");
   };
   try {
-    const failed = await cleanup(db, storage);
+    const failed = await cleanup(new ImagesRepository(db), storage);
     assert.ok(failed.failed > 0);
   } finally {
     storage.remove = remove;
   }
   assert.ok((await db.select().from(objectCleanup)).length > 0);
-  await cleanup(db, storage);
+  await cleanup(new ImagesRepository(db), storage);
   assert.equal((await fetch(read.url)).status, 404);
 });
 test("corrupt image and missing upload are rejected", async () => {

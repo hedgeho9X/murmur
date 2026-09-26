@@ -1,6 +1,6 @@
-/** Public JSON contracts shared by request validation, Scalar and Kotlin generation. */
+/** Immutable message payloads and ordered content parts. */
 import { z } from "@hono/zod-openapi";
-export const Id = z.string().uuid();
+import { Id } from "../../common/contracts.js";
 export const TextPart = z
   .object({ type: z.literal("text"), text: z.string().max(100_000) })
   .strict()
@@ -88,64 +88,3 @@ export const ToolMessage = z
 export const Message = z
   .discriminatedUnion("role", [UserMessage, AssistantMessage, ToolMessage])
   .openapi("Message");
-export const Post = z
-  .object({
-    id: Id,
-    title: z.string().nullable(),
-    created_at: z.string().datetime(),
-    updated_at: z.string().datetime(),
-  })
-  .openapi("Post");
-export const CreatePost = z
-  .object({
-    title: z.string().trim().min(1).max(200).nullable().optional(),
-    content: UserContent,
-  })
-  .strict()
-  .openapi("CreatePostRequest");
-export const CreatedPost = z
-  .object({ post: Post, message: UserMessage })
-  .openapi("CreatedPost");
-export const PostDetail = z
-  .object({ post: Post, messages: z.array(Message) })
-  .openapi("PostDetail");
-export const ErrorResponse = z
-  .object({ error: z.object({ code: z.string(), message: z.string() }) })
-  .openapi("ErrorResponse");
-export const Image = z
-  .object({
-    id: Id,
-    content_type: z.string(),
-    size_bytes: z.number().int(),
-    width: z.number().int().nullable(),
-    height: z.number().int().nullable(),
-    status: z.enum(["pending", "ready"]),
-    created_at: z.string().datetime(),
-  })
-  .openapi("Image");
-export const UploadRequest = z
-  .object({
-    content_type: z.enum(["image/jpeg", "image/png", "image/webp"]),
-    size_bytes: z
-      .number()
-      .int()
-      .min(1)
-      .max(10 * 1024 * 1024),
-  })
-  .strict()
-  .openapi("UploadRequest");
-export const UploadResponse = z
-  .object({
-    image: Image,
-    upload_url: z.string().url(),
-    expires_in: z.number().int(),
-  })
-  .openapi("UploadResponse");
-export const KeyHeader = z.object({
-  "Idempotency-Key": z
-    .string()
-    .min(8)
-    .max(128)
-    .regex(/^[A-Za-z0-9_-]+$/),
-});
-export type NewPost = z.infer<typeof CreatePost>;

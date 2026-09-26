@@ -1,6 +1,6 @@
 /** Applies checked-in migrations only to the explicitly configured database. */
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { connect } from "../src/db.js";
+import { connect } from "../src/database/database.client.js";
 import { config } from "../src/config.js";
 const { db, pool } = connect(config().DATABASE_URL);
 try {
