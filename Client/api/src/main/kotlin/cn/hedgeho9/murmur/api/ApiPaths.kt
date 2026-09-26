@@ -3,6 +3,8 @@ package cn.hedgeho9.murmur.api
 
 object ApiPaths {
     const val STREAM_ASR = "/api/v1/asr/stream"
+    const val EDIT_MESSAGE = "/api/v1/posts/{id}/messages/{messageId}"
+    const val SUGGEST_TAGS = "/api/v1/tags"
     const val APPEND_MESSAGE = "/api/v1/posts/{id}/messages"
     const val CREATE_POST = "/api/v1/posts"
     const val LIST_POSTS = "/api/v1/posts"

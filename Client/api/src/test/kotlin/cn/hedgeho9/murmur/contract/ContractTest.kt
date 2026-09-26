@@ -32,13 +32,19 @@ class ContractTest : ShouldSpec() {
                 val token = requireNotNull(System.getenv("API_TOKEN"))
                 val api = ApiClient(baseUrl = "http://127.0.0.1:${System.getenv("PORT") ?: "8787"}/", authNames = arrayOf("bearerAuth")).setBearerToken(token).createService(PostsApi::class.java)
                 val postId = "01993240-1000-7000-8000-" + UUID.randomUUID().toString().replace("-", "").takeLast(12)
-                val request = Serializer.kotlinxSerializationJson.decodeFromString<CreatePostRequest>("""{"id":"$postId","content":{"parts":[{"type":"text","text":"Kotlin integration acceptance"}]}}""")
+                val tag = "contract-" + postId.takeLast(12)
+                val request = Serializer.kotlinxSerializationJson.decodeFromString<CreatePostRequest>("""{"id":"$postId","content":{"parts":[{"type":"text","text":"Kotlin integration acceptance #$tag"}]}}""")
                 val response = api.createPost(request)
                 response.code() shouldBe 201
                 val result = requireNotNull(response.body())
                 try {
                     api.createPost(request).code() shouldBe 409
                     val detail = requireNotNull(api.getPost(result.post.id).body())
+                    result.post.tags shouldBe listOf(tag)
+                    requireNotNull(api.suggestTags(tag).body()).items.first().name shouldBe tag
+                    requireNotNull(api.listPosts(q = "#$tag").body()).items.first().id shouldBe result.post.id
+                    api.editMessage(result.post.id,result.message.id,EditMessageRequest("updated #changed")).code() shouldBe 200
+                    requireNotNull(api.getPost(result.post.id).body()).post.tags shouldBe listOf("changed")
                     detail.messages.size shouldBe 1
                     (detail.messages.first() as Message.UserWrapper).value.id shouldBe result.message.id
                 } finally {

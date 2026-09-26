@@ -52,9 +52,11 @@ All URIs are relative to *http://localhost*
 | *PostsApi* | [**appendMessage**](docs/PostsApi.md#appendmessage) | **POST** api/v1/posts/{id}/messages |  |
 | *PostsApi* | [**createPost**](docs/PostsApi.md#createpost) | **POST** api/v1/posts |  |
 | *PostsApi* | [**deletePost**](docs/PostsApi.md#deletepost) | **DELETE** api/v1/posts/{id} |  |
+| *PostsApi* | [**editMessage**](docs/PostsApi.md#editmessage) | **PATCH** api/v1/posts/{id}/messages/{messageId} |  |
 | *PostsApi* | [**getPost**](docs/PostsApi.md#getpost) | **GET** api/v1/posts/{id} |  |
 | *PostsApi* | [**listPosts**](docs/PostsApi.md#listposts) | **GET** api/v1/posts |  |
 | *PostsApi* | [**renamePost**](docs/PostsApi.md#renamepost) | **PATCH** api/v1/posts/{id} |  |
+| *PostsApi* | [**suggestTags**](docs/PostsApi.md#suggesttags) | **GET** api/v1/tags |  |
 
 
 <a id="documentation-for-models"></a>
@@ -75,6 +77,7 @@ All URIs are relative to *http://localhost*
  - [cn.hedgeho9.murmur.api.models.AssistantMessage](docs/AssistantMessage.md)
  - [cn.hedgeho9.murmur.api.models.CreatePostRequest](docs/CreatePostRequest.md)
  - [cn.hedgeho9.murmur.api.models.CreatedPost](docs/CreatedPost.md)
+ - [cn.hedgeho9.murmur.api.models.EditMessageRequest](docs/EditMessageRequest.md)
  - [cn.hedgeho9.murmur.api.models.ErrorResponse](docs/ErrorResponse.md)
  - [cn.hedgeho9.murmur.api.models.ErrorResponseError](docs/ErrorResponseError.md)
  - [cn.hedgeho9.murmur.api.models.Image](docs/Image.md)
@@ -86,6 +89,8 @@ All URIs are relative to *http://localhost*
  - [cn.hedgeho9.murmur.api.models.PostDetail](docs/PostDetail.md)
  - [cn.hedgeho9.murmur.api.models.PostPage](docs/PostPage.md)
  - [cn.hedgeho9.murmur.api.models.RenamePostRequest](docs/RenamePostRequest.md)
+ - [cn.hedgeho9.murmur.api.models.TagSuggestion](docs/TagSuggestion.md)
+ - [cn.hedgeho9.murmur.api.models.TagSuggestions](docs/TagSuggestions.md)
  - [cn.hedgeho9.murmur.api.models.TextPart](docs/TextPart.md)
  - [cn.hedgeho9.murmur.api.models.ToolCallPart](docs/ToolCallPart.md)
  - [cn.hedgeho9.murmur.api.models.ToolContent](docs/ToolContent.md)

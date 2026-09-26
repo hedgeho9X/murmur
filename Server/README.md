@@ -2,7 +2,7 @@
 
 Murmur 的 Hono 后端。
 
-Kotlin / Android 个人记录助手的 Hono 后端。当前提供帖子 CRUD、首条不可变消息、S3 图片及生成客户端。
+Kotlin / Android 个人记录助手的 Hono 后端。当前提供帖子 CRUD、用户笔记文字编辑与正文标签、S3 图片及生成客户端。
 
 ## 本地启动
 
@@ -81,3 +81,5 @@ HTTP 路由位于 `src/api/`；业务模块位于 `src/modules/<模块名>/`。�
 `POST /api/v1/posts/{id}/messages` 接收客户端生成的消息 UUIDv7 和 content，原子追加消息及附件；重复消息 ID 返回 409，不修改历史。
 
 `GET /api/v1/asr/stream` 为认证 WebSocket，具体帧协议及配置见 [ASR 说明](docs/asr.md)。`.env` 中填写 ASR_API_KEY 后重启服务。没有密钥时返回 503，普通帖子接口仍可使用。
+
+标签由用户正文中的 `#标签` 派生。部署新增标签功能后运行 `npm run tags:reindex` 为已有记录重建索引；该脚本不修改消息正文。`PATCH /api/v1/posts/{id}/messages/{messageId}` 仅覆盖用户文字，保留图片及消息身份，不保留修改历史。

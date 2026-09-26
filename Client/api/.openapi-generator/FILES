@@ -15,6 +15,7 @@ docs/AssistantContentPartsInner.md
 docs/AssistantMessage.md
 docs/CreatePostRequest.md
 docs/CreatedPost.md
+docs/EditMessageRequest.md
 docs/ErrorResponse.md
 docs/ErrorResponseError.md
 docs/Image.md
@@ -28,6 +29,8 @@ docs/PostDetail.md
 docs/PostPage.md
 docs/PostsApi.md
 docs/RenamePostRequest.md
+docs/TagSuggestion.md
+docs/TagSuggestions.md
 docs/TextPart.md
 docs/ToolCallPart.md
 docs/ToolContent.md
@@ -79,6 +82,7 @@ src/main/kotlin/cn/hedgeho9/murmur/api/models/AssistantContentPartsInner.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AssistantMessage.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/CreatePostRequest.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/CreatedPost.kt
+src/main/kotlin/cn/hedgeho9/murmur/api/models/EditMessageRequest.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/ErrorResponse.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/ErrorResponseError.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/Image.kt
@@ -90,6 +94,8 @@ src/main/kotlin/cn/hedgeho9/murmur/api/models/Post.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/PostDetail.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/PostPage.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/RenamePostRequest.kt
+src/main/kotlin/cn/hedgeho9/murmur/api/models/TagSuggestion.kt
+src/main/kotlin/cn/hedgeho9/murmur/api/models/TagSuggestions.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/TextPart.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/ToolCallPart.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/ToolContent.kt

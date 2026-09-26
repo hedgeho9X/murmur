@@ -118,11 +118,54 @@ const appendMessageRoute = createRoute({
   },
   responses: { 201: json(UserMessage), ...errors },
 });
+/** 标签补全 OpenAPI 契约，前缀为空时返回常用标签。 */
+const suggestTagsRoute = createRoute({
+  method: "get",
+  path: "/api/v1/tags",
+  operationId: "suggestTags",
+  tags: ["Posts"],
+  security,
+  request: { query: z.object({ prefix: z.string().max(64).default("") }) },
+  responses: { 200: json(C.TagSuggestions), ...errors },
+});
+/** 用户笔记正文覆盖契约，不接收图片变更或历史版本参数。 */
+const editMessageRoute = createRoute({
+  method: "patch",
+  path: "/api/v1/posts/{id}/messages/{messageId}",
+  operationId: "editMessage",
+  tags: ["Posts"],
+  security,
+  request: {
+    params: z.object({ id: z.uuid(), messageId: z.uuid() }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: C.EditMessage } },
+    },
+  },
+  responses: { 200: json(UserMessage), ...errors },
+});
 /**
  * 将帖子路由注册到传入的 Hono 应用，注入帖子服务作为处理依赖。
  * 注册本身不执行查询；收到请求后才调用服务并返回约定的 HTTP 响应。
  */
 export function registerPostsApi(app: OpenAPIHono, service: PostsService) {
+  /** PATCH /api/v1/posts/{id}/messages/{messageId}：覆盖用户文字并重建标签，不保留历史。 */
+  app.openapi(editMessageRoute, async (c) =>
+    c.json(
+      UserMessage.parse(
+        await service.editText(
+          c.req.valid("param").id,
+          c.req.valid("param").messageId,
+          c.req.valid("json").text,
+        ),
+      ),
+      200,
+    ),
+  );
+  /** GET /api/v1/tags：按前缀补全已存在的标签。 */
+  app.openapi(suggestTagsRoute, async (c) =>
+    c.json(await service.suggestTags(c.req.valid("query").prefix), 200),
+  );
   /** POST /api/v1/posts/{id}/messages：追加用户记录并返回分配的轮次，不修改历史。 */
   app.openapi(appendMessageRoute, async (c) =>
     c.json(

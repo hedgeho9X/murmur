@@ -163,7 +163,7 @@ test("failed image binding rolls back post and message; same UUID can retry", as
   assert.equal(afterCount, beforeCount);
   await json(await request("/api/v1/posts", "POST", { content }, id), 201);
 });
-test("database rejects message UPDATE; assistant/tool messages retain same turn", async () => {
+test("database rejects invalid user edits; assistant/tool messages retain same turn", async () => {
   const result = await json(
     await request("/api/v1/posts", "POST", { content }),
     201,
@@ -341,6 +341,26 @@ test("real S3 upload, content verification, immutable final image and cascade cl
     }),
     409,
   );
+  const editedImageNote = await json(
+    await request(
+      `/api/v1/posts/${result.post.id}/messages/${result.message.id}`,
+      "PATCH",
+      { text: "caption #photo" },
+    ),
+    200,
+  );
+  assert.deepEqual(
+    editedImageNote.content.parts.filter((p: any) => p.type === "image"),
+    [{ type: "image", image_id: u.image.id }],
+  );
+  await json(
+    await request(
+      `/api/v1/posts/${result.post.id}/messages/${result.message.id}`,
+      "PATCH",
+      { text: "" },
+    ),
+    200,
+  );
   assert.equal(
     (await request("/api/v1/posts/" + result.post.id, "DELETE")).status,
     204,
@@ -445,4 +465,127 @@ test("post list searches actual text, returns preview and filters images", async
     200,
   );
   assert.equal(filtered.items.length, 0);
+});
+
+test("inline tags follow submitted text and support completion and exact filtering", async () => {
+  const marker = "tag" + uuidv7().replaceAll("-", "").slice(-24);
+  const text = `记录 #${marker.toUpperCase()} #${marker} #想法。\n# 标题 https://example.com/#link \`#code\``;
+  const made = await json(
+    await request("/api/v1/posts", "POST", {
+      content: { parts: [{ type: "text", text }] },
+    }),
+    201,
+  );
+  assert.deepEqual(made.post.tags, [marker, "想法"]);
+  const suggestions = await json(
+    await request(`/api/v1/tags?prefix=${marker}`),
+    200,
+  );
+  assert.deepEqual(suggestions.items, [{ name: marker, count: 1 }]);
+  const page = await json(
+    await request(`/api/v1/posts?q=${encodeURIComponent("#" + marker)}`),
+    200,
+  );
+  assert.equal(page.items[0].id, made.post.id);
+  await json(
+    await request(`/api/v1/posts/${made.post.id}/messages`, "POST", {
+      id: uuidv7(),
+      content: { parts: [{ type: "text", text: "补充 #生活 #想法" }] },
+    }),
+    201,
+  );
+  const detail = await json(
+    await request(`/api/v1/posts/${made.post.id}`),
+    200,
+  );
+  assert.deepEqual(detail.post.tags, [marker, "想法", "生活"]);
+  assert.equal(detail.messages[0].content.parts[0].text, text);
+  await json(
+    await request("/api/v1/posts", "POST", { content, tags: ["manual"] }),
+    422,
+  );
+  await request(`/api/v1/posts/${made.post.id}`, "DELETE");
+  assert.deepEqual(
+    (await json(await request(`/api/v1/tags?prefix=${marker}`), 200)).items,
+    [],
+  );
+});
+
+test("editing user text replaces content without history and recomputes tags across messages", async () => {
+  const made = await json(
+    await request("/api/v1/posts", "POST", {
+      content: { parts: [{ type: "text", text: "old #work #shared" }] },
+    }),
+    201,
+  );
+  await json(
+    await request(`/api/v1/posts/${made.post.id}/messages`, "POST", {
+      id: uuidv7(),
+      content: { parts: [{ type: "text", text: "keep #shared" }] },
+    }),
+    201,
+  );
+  const edited = await json(
+    await request(
+      `/api/v1/posts/${made.post.id}/messages/${made.message.id}`,
+      "PATCH",
+      { text: "new #life" },
+    ),
+    200,
+  );
+  assert.equal(edited.id, made.message.id);
+  assert.equal(edited.created_at, made.message.created_at);
+  const detail = await json(
+    await request(`/api/v1/posts/${made.post.id}`),
+    200,
+  );
+  assert.equal(detail.messages.length, 2);
+  assert.deepEqual(detail.post.tags, ["life", "shared"]);
+  assert.equal(detail.messages[0].content.parts[0].text, "new #life");
+  await json(
+    await request(
+      `/api/v1/posts/${made.post.id}/messages/${made.message.id}`,
+      "PATCH",
+      { text: "" },
+    ),
+    422,
+  );
+  const assistantId = randomUUID();
+  await db
+    .insert(messages)
+    .values({
+      id: assistantId,
+      post_id: made.post.id,
+      turn_id: made.message.turn_id,
+      role: "assistant",
+      content: {
+        parts: [{ type: "text", text: "reply" }],
+        finish_reason: "stop",
+      },
+    });
+  await json(
+    await request(
+      `/api/v1/posts/${made.post.id}/messages/${assistantId}`,
+      "PATCH",
+      { text: "overwrite" },
+    ),
+    409,
+  );
+  await assert.rejects(
+    db
+      .update(messages)
+      .set({
+        content: {
+          parts: [{ type: "text", text: "overwrite" }],
+          finish_reason: "stop",
+        },
+      })
+      .where(eq(messages.id, assistantId)),
+  );
+  await assert.rejects(
+    db
+      .update(messages)
+      .set({ turn_id: randomUUID() })
+      .where(eq(messages.id, made.message.id)),
+  );
 });

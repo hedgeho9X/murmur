@@ -6,6 +6,7 @@ import { created } from "./columns.js";
 export const posts = pgTable("posts", {
   id: uuid().primaryKey(),
   title: text(),
+  tags: text().array().notNull().default([]),
   created_at: created(),
   updated_at: timestamp("updated_at", { withTimezone: true, precision: 3 })
     .notNull()

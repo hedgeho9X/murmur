@@ -1,9 +1,9 @@
-/** 定义不可变消息、帖子外键及查询索引；更新限制由 SQL 迁移中的触发器实施。 */
+/** 定义角色消息、帖子外键及查询索引；更新限制由 SQL 迁移中的触发器实施。 */
 import { pgTable, uuid, text, jsonb, index } from "drizzle-orm/pg-core";
 import { created } from "./columns.js";
 import { posts } from "./posts.schema.js";
 
-/** 只追加的消息记录；帖子删除时级联清理，更新限制由数据库触发器实施。 */
+/** 用户文字可覆盖、助理与工具消息不可变的记录；帖子删除时级联清理，更新限制由数据库触发器实施。 */
 export const messages = pgTable(
   "messages",
   {

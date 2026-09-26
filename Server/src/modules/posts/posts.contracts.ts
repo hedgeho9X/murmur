@@ -9,10 +9,18 @@ import {
   UserMessage,
   Message,
 } from "../messages/messages.contracts.js";
+/** 已有标签与关联帖子数量，供搜索补全使用。 */
+export const TagSuggestion = z
+  .object({ name: z.string(), count: z.number().int() })
+  .openapi("TagSuggestion");
+export const TagSuggestions = z
+  .object({ items: z.array(TagSuggestion) })
+  .openapi("TagSuggestions");
 export const Post = z
   .object({
     id: Id,
     title: z.string().nullable(),
+    tags: z.array(z.string()),
     preview: z.string().optional(),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
@@ -40,7 +48,16 @@ export type NewPost = z.infer<typeof CreatePost>;
 
 /** 向已有帖子追加用户记录；客户端在草稿中生成稳定消息 UUIDv7。 */
 export const AppendMessage = z
-  .object({ id: z.uuid({ version: "v7" }), content: UserContent })
+  .object({
+    id: z.uuid({ version: "v7" }),
+    content: UserContent,
+  })
   .strict()
   .openapi("AppendMessageRequest");
 export type NewMessage = z.infer<typeof AppendMessage>;
+
+/** 覆盖一条用户笔记的文字，图片与消息身份保持不变。 */
+export const EditMessage = z
+  .object({ text: z.string().max(100_000) })
+  .strict()
+  .openapi("EditMessageRequest");

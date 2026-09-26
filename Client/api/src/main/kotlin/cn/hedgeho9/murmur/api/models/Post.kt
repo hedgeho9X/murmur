@@ -25,6 +25,7 @@ import kotlinx.serialization.Contextual
  *
  * @param id 
  * @param title 
+ * @param tags 
  * @param createdAt 
  * @param updatedAt 
  * @param preview 
@@ -38,6 +39,9 @@ data class Post (
 
     @SerialName(value = "title")
     val title: kotlin.String?,
+
+    @SerialName(value = "tags")
+    val tags: kotlin.collections.List<kotlin.String>,
 
     @SerialName(value = "created_at")
     val createdAt: kotlin.String,

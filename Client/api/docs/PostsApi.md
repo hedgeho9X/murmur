@@ -7,9 +7,11 @@ All URIs are relative to *http://localhost*
 | [**appendMessage**](PostsApi.md#appendMessage) | **POST** api/v1/posts/{id}/messages |  |
 | [**createPost**](PostsApi.md#createPost) | **POST** api/v1/posts |  |
 | [**deletePost**](PostsApi.md#deletePost) | **DELETE** api/v1/posts/{id} |  |
+| [**editMessage**](PostsApi.md#editMessage) | **PATCH** api/v1/posts/{id}/messages/{messageId} |  |
 | [**getPost**](PostsApi.md#getPost) | **GET** api/v1/posts/{id} |  |
 | [**listPosts**](PostsApi.md#listPosts) | **GET** api/v1/posts |  |
 | [**renamePost**](PostsApi.md#renamePost) | **PATCH** api/v1/posts/{id} |  |
+| [**suggestTags**](PostsApi.md#suggestTags) | **GET** api/v1/tags |  |
 
 
 
@@ -148,6 +150,50 @@ val apiClient = ApiClient()
 apiClient.setBearerToken("TOKEN")
 val webService = apiClient.createWebservice(PostsApi::class.java)
 val id : java.util.UUID = 38400000-8cf0-11bd-b23e-10b96e4ef00d // java.util.UUID | 
+val messageId : java.util.UUID = 38400000-8cf0-11bd-b23e-10b96e4ef00d // java.util.UUID | 
+val editMessageRequest : EditMessageRequest =  // EditMessageRequest | 
+
+launch(Dispatchers.IO) {
+    val result : UserMessage = webService.editMessage(id, messageId, editMessageRequest)
+}
+```
+
+### Parameters
+| **id** | **java.util.UUID**|  | |
+| **messageId** | **java.util.UUID**|  | |
+| Name | Type | Description  | Notes |
+| ------------- | ------------- | ------------- | ------------- |
+| **editMessageRequest** | [**EditMessageRequest**](EditMessageRequest.md)|  | |
+
+### Return type
+
+[**UserMessage**](UserMessage.md)
+
+### Authorization
+
+
+Configure bearerAuth:
+    ApiClient().setBearerToken("TOKEN")
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+
+
+
+### Example
+```kotlin
+// Import classes:
+//import cn.hedgeho9.murmur.api.*
+//import cn.hedgeho9.murmur.api.infrastructure.*
+//import cn.hedgeho9.murmur.api.models.*
+
+val apiClient = ApiClient()
+apiClient.setBearerToken("TOKEN")
+val webService = apiClient.createWebservice(PostsApi::class.java)
+val id : java.util.UUID = 38400000-8cf0-11bd-b23e-10b96e4ef00d // java.util.UUID | 
 
 launch(Dispatchers.IO) {
     val result : PostDetail = webService.getPost(id)
@@ -260,5 +306,45 @@ Configure bearerAuth:
 ### HTTP request headers
 
  - **Content-Type**: application/json
+ - **Accept**: application/json
+
+
+
+
+### Example
+```kotlin
+// Import classes:
+//import cn.hedgeho9.murmur.api.*
+//import cn.hedgeho9.murmur.api.infrastructure.*
+//import cn.hedgeho9.murmur.api.models.*
+
+val apiClient = ApiClient()
+apiClient.setBearerToken("TOKEN")
+val webService = apiClient.createWebservice(PostsApi::class.java)
+val prefix : kotlin.String = prefix_example // kotlin.String | 
+
+launch(Dispatchers.IO) {
+    val result : TagSuggestions = webService.suggestTags(prefix)
+}
+```
+
+### Parameters
+| Name | Type | Description  | Notes |
+| ------------- | ------------- | ------------- | ------------- |
+| **prefix** | **kotlin.String**|  | [optional] [default to &quot;&quot;] |
+
+### Return type
+
+[**TagSuggestions**](TagSuggestions.md)
+
+### Authorization
+
+
+Configure bearerAuth:
+    ApiClient().setBearerToken("TOKEN")
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
  - **Accept**: application/json
 

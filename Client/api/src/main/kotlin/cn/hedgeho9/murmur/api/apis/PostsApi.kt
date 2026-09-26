@@ -10,11 +10,13 @@ import kotlinx.serialization.Serializable
 import cn.hedgeho9.murmur.api.models.AppendMessageRequest
 import cn.hedgeho9.murmur.api.models.CreatePostRequest
 import cn.hedgeho9.murmur.api.models.CreatedPost
+import cn.hedgeho9.murmur.api.models.EditMessageRequest
 import cn.hedgeho9.murmur.api.models.ErrorResponse
 import cn.hedgeho9.murmur.api.models.Post
 import cn.hedgeho9.murmur.api.models.PostDetail
 import cn.hedgeho9.murmur.api.models.PostPage
 import cn.hedgeho9.murmur.api.models.RenamePostRequest
+import cn.hedgeho9.murmur.api.models.TagSuggestions
 import cn.hedgeho9.murmur.api.models.UserMessage
 
 interface PostsApi {
@@ -81,6 +83,29 @@ interface PostsApi {
      */
     @DELETE("api/v1/posts/{id}")
     suspend fun deletePost(@Path("id") id: java.util.UUID): Response<Unit>
+
+    /**
+     * PATCH api/v1/posts/{id}/messages/{messageId}
+     * 
+     * 
+     * Responses:
+     *  - 200: Success
+     *  - 400: Error
+     *  - 401: Error
+     *  - 404: Error
+     *  - 409: Error
+     *  - 413: Error
+     *  - 422: Error
+     *  - 500: Error
+     *  - 503: Error
+     *
+     * @param id 
+     * @param messageId 
+     * @param editMessageRequest 
+     * @return [UserMessage]
+     */
+    @PATCH("api/v1/posts/{id}/messages/{messageId}")
+    suspend fun editMessage(@Path("id") id: java.util.UUID, @Path("messageId") messageId: java.util.UUID, @Body editMessageRequest: EditMessageRequest): Response<UserMessage>
 
     /**
      * GET api/v1/posts/{id}
@@ -158,5 +183,26 @@ interface PostsApi {
      */
     @PATCH("api/v1/posts/{id}")
     suspend fun renamePost(@Path("id") id: java.util.UUID, @Body renamePostRequest: RenamePostRequest): Response<Post>
+
+    /**
+     * GET api/v1/tags
+     * 
+     * 
+     * Responses:
+     *  - 200: Success
+     *  - 400: Error
+     *  - 401: Error
+     *  - 404: Error
+     *  - 409: Error
+     *  - 413: Error
+     *  - 422: Error
+     *  - 500: Error
+     *  - 503: Error
+     *
+     * @param prefix  (optional, default to "")
+     * @return [TagSuggestions]
+     */
+    @GET("api/v1/tags")
+    suspend fun suggestTags(@Query("prefix") prefix: kotlin.String? = ""): Response<TagSuggestions>
 
 }

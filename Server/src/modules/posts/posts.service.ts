@@ -1,6 +1,6 @@
 /**
  * 校验帖子业务输入，协调事务创建、图片绑定与列表响应。
- * 所有数据库访问交由仓储，消息正文在创建后不允许修改。
+ * 所有数据库访问交由仓储，用户笔记允许覆盖文字，助理和工具消息保持不可变。
  */
 import { ApiError } from "../../common/errors.js";
 import { wire } from "../../common/serialization.js";
@@ -70,6 +70,7 @@ export class PostsService {
     });
     if (result.kind === "missing")
       throw new ApiError(404, "POST_NOT_FOUND", "Post not found");
+
     if (result.kind === "duplicate")
       throw new ApiError(
         409,
@@ -135,6 +136,25 @@ export class PostsService {
     const post = await this.posts.rename(id, title);
     if (!post) throw new ApiError(404, "POST_NOT_FOUND", "Post not found");
     return wire(post);
+  }
+  /** 覆盖指定用户笔记文字并同步标签；不保存历史版本。 */
+  async editText(postId: string, messageId: string, text: string) {
+    const result = await this.posts.editText(postId, messageId, text);
+    if (result.kind === "missing")
+      throw new ApiError(404, "MESSAGE_NOT_FOUND", "Message not found");
+    if (result.kind === "readonly")
+      throw new ApiError(
+        409,
+        "MESSAGE_READONLY",
+        "Only user notes can be edited",
+      );
+    if (result.kind === "empty")
+      throw new ApiError(422, "EMPTY_CONTENT", "Text or image required");
+    return wire(result.message);
+  }
+  /** 返回可用于搜索框与编辑器补全的已有标签。 */
+  async suggestTags(prefix: string) {
+    return { items: await this.posts.suggestTags(prefix) };
   }
   /**
    * 删除指定帖子及所属数据，重复调用不会重新创建数据；对象删除通过持久队列完成。

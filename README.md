@@ -16,7 +16,7 @@
 ## 已实现
 
 - 帖子创建、分页读取、详情、改标题与级联删除。
-- 不可变消息：user / assistant / tool 统一模型，content JSONB，turn_id 分组。
+- user / assistant / tool 统一消息模型，content JSONB，turn_id 分组；用户笔记文字可直接编辑，不保留版本，助理与工具消息不可变。
 - 客户端 UUIDv7 标识帖子，首条消息与帖子事务创建；重复 ID 返回 409。
 - S3 签名上传、真实图片校验、私有读取与可重试清理。
 - OpenAPI → Kotlin 客户端生成，多态 JSON 与真实 HTTP 契约测试。
