@@ -55,6 +55,8 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
     private var localLimit = 40
     private val mutable = MutableStateFlow(UiState(base = store.baseUrl(), token = store.token()))
     val state = mutable.asStateFlow()
+    private val errorQueue = ArrayDeque<String>()
+    private val reportedSyncErrors = mutableSetOf<String>()
     private var speech: SpeechRecorder? = null
     private var detailJob: Job? = null
     private var tagJob: Job? = null
@@ -111,6 +113,16 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
                     else it.selectedTags,
             )
         }
+        val failures =
+            status
+                .filterValues { it != "待同步" }
+                .map { (id, message) -> "$scope:$id:$message" to message } +
+                listOfNotNull(lastError?.let { "$scope:pull:$it" to it })
+        val active = failures.map { it.first }.toSet()
+        reportedSyncErrors.retainAll(active)
+        val fresh = failures.filter { it.first !in reportedSyncErrors }
+        reportedSyncErrors.addAll(active)
+        fresh.map { it.second }.distinct().forEach { error("云端同步未完成，本地记录仍保留。\n$it") }
     }
 
     /** 手动重试保留的离线操作，并触发一次远端刷新。 */
@@ -123,7 +135,13 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
 
     /** 在主线程更新状态，供 UI 订阅。 */
     private fun change(block: (UiState) -> UiState) {
-        mutable.value = block(mutable.value)
+        val previous = mutable.value
+        val next = block(previous)
+        val incoming = next.error
+        if (previous.error != null && incoming != null && incoming != previous.error) {
+            if (incoming !in errorQueue) errorQueue.addLast(incoming)
+            mutable.value = next.copy(error = previous.error)
+        } else mutable.value = next
     }
 
     /** 保存草稿后更新界面，失败时显示错误而不丢弃内存内容。 */
@@ -183,7 +201,7 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
 
     /** 清除已展示的操作错误。 */
     fun clearError() {
-        change { it.copy(error = null) }
+        mutable.value = mutable.value.copy(error = errorQueue.removeFirstOrNull())
     }
 
     /** 显示权限或系统错误，保留草稿。 */
@@ -194,7 +212,9 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
     /** 保存连接配置并更新 API 调用入口。 */
     fun settings(url: String, token: String) {
         try {
+            val changedServer = state.value.base.trimEnd('/') != url.trimEnd('/')
             store.configure(url, token)
+            if (changedServer) draft(state.value.draft.copy(postId = null, uploads = emptyMap()))
             detailJob?.cancel()
             tagJob?.cancel()
             change {
@@ -216,6 +236,26 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
             NotesSync.schedule(getApplication(), immediate = true)
         } catch (_: Exception) {
             error("请填写有效的 HTTP(S) 地址")
+        }
+    }
+
+    /** 将补充草稿改为独立笔记，保留正文、照片与可验证的上传凭据。 */
+    fun saveDraftAsNewNote() {
+        draft(state.value.draft.copy(postId = null))
+    }
+
+    /** 用户选择另存后，将不存在目标的补充任务转换为独立笔记并重试。 */
+    fun recoverMissingNote(id: String) {
+        viewModelScope.launch {
+            try {
+                val target =
+                    withContext(Dispatchers.IO) { database.recoverMissingAppend(scopeKey(), id) }
+                clearError()
+                open(target)
+                NotesSync.schedule(getApplication(), immediate = true)
+            } catch (_: Exception) {
+                error("无法自动另存，这份本地内容仍已保留")
+            }
         }
     }
 

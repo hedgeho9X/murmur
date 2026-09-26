@@ -64,7 +64,13 @@ class MurmurApi(base: String, token: String) {
 
     /** 将 HTTP 失败转换为可见错误，正文只读取稳定错误码，不输出认证信息。 */
     private fun <T> Response<T>.value(): T {
-        if (!isSuccessful) throw ApiFailure(code())
+        if (!isSuccessful) {
+            android.util.Log.w(
+                "MurmurApi",
+                "HTTP ${code()} ${raw().request.method} ${raw().request.url.encodedPath} requestId=${headers()["X-Request-ID"].orEmpty()}",
+            )
+            throw ApiFailure(code())
+        }
         return body() ?: throw IllegalStateException("服务器返回空内容")
     }
 
@@ -141,7 +147,22 @@ class MurmurApi(base: String, token: String) {
     }
 
     /** 使用落盘票据恢复上传；已完成对象可直接确认，过期且未上传的票据重新申请。 */
-    suspend fun uploadQueued(path: String, seq: Long, scope: String, db: NotesDatabase): String {
+    suspend fun uploadQueued(
+        path: String,
+        seq: Long,
+        scope: String,
+        db: NotesDatabase,
+        existingId: String? = null,
+    ): String {
+        if (existingId != null) {
+            try {
+                atStage("确认已上传图片") { images.getImageUrl(UUID.fromString(existingId)).value() }
+                withContext(Dispatchers.IO) { db.media(scope, existingId, path) }
+                return existingId
+            } catch (e: StageFailure) {
+                if ((e.cause as? ApiFailure)?.status != 404) throw e
+            }
+        }
         val previous = withContext(Dispatchers.IO) { db.ticket(seq, path) }
         if (previous != null) {
             val ticket = codec.decodeFromString<UploadResponse>(previous.first)

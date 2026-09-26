@@ -84,7 +84,14 @@ class NotesSyncWorker(context: Context, params: WorkerParameters) :
                             "append" -> {
                                 var draft = requireNotNull(row.change.draft)
                                 for (path in draft.images) {
-                                    val imageId = api.uploadQueued(path, row.seq, scope, db)
+                                    val imageId =
+                                        api.uploadQueued(
+                                            path,
+                                            row.seq,
+                                            scope,
+                                            db,
+                                            draft.uploads[path],
+                                        )
                                     draft = draft.copy(uploads = draft.uploads + (path to imageId))
                                 }
                                 atStage("保存云端笔记") { api.send(draft) }

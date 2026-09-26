@@ -163,13 +163,6 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
             }
         else controller.unbind()
     }
-    val snackbar = remember { SnackbarHostState() }
-    LaunchedEffect(s.error) {
-        s.error?.let {
-            snackbar.showSnackbar(it)
-            vm.clearError()
-        }
-    }
     BackHandler(enabled = !s.editor && s.page == "detail") { vm.showHistory() }
     BackHandler(enabled = !s.editor && drawer.isOpen) { scope.launch { drawer.close() } }
     Box(Modifier.fillMaxSize()) {
@@ -196,7 +189,6 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
         ) {
             Scaffold(
                 containerColor = Color.White,
-                snackbarHost = { SnackbarHost(snackbar) },
                 topBar = {
                     Row(
                         Modifier.statusBarsPadding()
@@ -517,6 +509,11 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                     ) {}
                     .padding(22.dp)
             ) {
+                if (s.editingMessage == null && s.draft.postId != null)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("补充草稿", modifier = Modifier.weight(1f), color = Color.Gray)
+                        TextButton(onClick = vm::saveDraftAsNewNote) { Text("另存为新笔记") }
+                    }
                 if (s.editingMessage != null)
                     LazyRow {
                         items(s.editingMessage?.images.orEmpty()) { url ->
@@ -683,8 +680,10 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                             } catch (_: IllegalArgumentException) {
                                                 "服务器地址格式错误"
                                             }
-                                        if (url == testUrl && token == testToken)
+                                        if (url == testUrl && token == testToken) {
                                             probeResult = result
+                                            if (!result.startsWith("连接正常")) vm.error(result)
+                                        }
                                     } finally {
                                         probing = false
                                     }
@@ -727,6 +726,26 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                 dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } },
             )
         preview?.let { PhotoViewer(it) { preview = null } }
+        // 独立错误窗口位于编辑器、键盘和图片预览上方，用户确认前不自动消失。
+        s.error?.let { message ->
+            AlertDialog(
+                onDismissRequest = vm::clearError,
+                title = { Text("操作未完成") },
+                text = { Text(message) },
+                confirmButton = { TextButton(onClick = vm::clearError) { Text("知道了") } },
+                dismissButton = {
+                    if (message.contains("401") || message.contains("令牌"))
+                        TextButton(
+                            onClick = {
+                                vm.clearError()
+                                settings = true
+                            }
+                        ) {
+                            Text("连接设置")
+                        }
+                },
+            )
+        }
     }
 }
 

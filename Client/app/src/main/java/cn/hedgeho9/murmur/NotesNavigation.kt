@@ -174,6 +174,10 @@ fun NotesList(s: UiState, vm: MurmurModel, padding: PaddingValues, listState: La
                         maxLines = 3,
                     )
                 }
+                if (s.syncStates[post.id.toString()]?.contains("404") == true)
+                    TextButton(onClick = { vm.recoverMissingNote(post.id.toString()) }) {
+                        Text("另存为新笔记")
+                    }
                 TagRow(post.tags, vm::searchTag)
                 Spacer(Modifier.height(6.dp))
                 Text(

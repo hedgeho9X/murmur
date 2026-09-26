@@ -97,6 +97,25 @@ class NotesDatabaseTest {
         Assert.assertEquals(cached.post.createdAt, row.createdAt)
     }
 
+    /** 旧服务器补充草稿另存时保留后续编辑与图片票据，避免再次上传或丢内容。 */
+    @Test
+    fun missingAppendCanBecomeNewNote() {
+        val parent = newId()
+        val draft = Draft(postId = parent, text = "original", images = listOf("/local/photo.jpg"))
+        db.create(scope, draft)
+        val first = db.queue(scope).single()
+        db.ticket(first.seq, "/local/photo.jpg", "ticket")
+        db.failed(first.seq, "保存云端笔记：服务器返回 HTTP 404", true)
+        db.edit(scope, parent, "local:${draft.id}", "latest")
+        val target = db.recoverMissingAppend(scope, parent)
+        Assert.assertEquals(draft.id, target)
+        Assert.assertNull(db.get(scope, parent))
+        Assert.assertEquals("latest", db.get(scope, target)!!.messages.single().text)
+        Assert.assertTrue(db.queue(scope).all { it.postId == target && !it.blocked })
+        Assert.assertEquals("create", db.queue(scope).first().change.kind)
+        Assert.assertEquals("ticket", db.ticket(first.seq, "/local/photo.jpg")!!.first)
+    }
+
     /** 相同草稿 ID、不同正文不能被当作重复点击吞掉。 */
     @Test
     fun conflictingDraftIsNotDiscarded() {

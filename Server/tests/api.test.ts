@@ -78,7 +78,12 @@ after(async () => {
   }
 });
 test("authentication, validation and immutable user role", async () => {
-  assert.equal((await app.request("/api/v1/posts")).status, 401);
+  const unauthorized = await app.request("/api/v1/posts");
+  assert.equal(unauthorized.status, 401);
+  assert.match(
+    unauthorized.headers.get("X-Request-ID") ?? "",
+    /^[0-9a-f-]{36}$/,
+  );
   await json(
     await request("/api/v1/posts", "POST", {
       content: { parts: [{ type: "text", text: "  " }] },
@@ -551,18 +556,16 @@ test("editing user text replaces content without history and recomputes tags acr
     422,
   );
   const assistantId = randomUUID();
-  await db
-    .insert(messages)
-    .values({
-      id: assistantId,
-      post_id: made.post.id,
-      turn_id: made.message.turn_id,
-      role: "assistant",
-      content: {
-        parts: [{ type: "text", text: "reply" }],
-        finish_reason: "stop",
-      },
-    });
+  await db.insert(messages).values({
+    id: assistantId,
+    post_id: made.post.id,
+    turn_id: made.message.turn_id,
+    role: "assistant",
+    content: {
+      parts: [{ type: "text", text: "reply" }],
+      finish_reason: "stop",
+    },
+  });
   await json(
     await request(
       `/api/v1/posts/${made.post.id}/messages/${assistantId}`,

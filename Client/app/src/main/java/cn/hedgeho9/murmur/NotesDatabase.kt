@@ -183,6 +183,38 @@ class NotesDatabase private constructor(context: Context) :
         }
     }
 
+    /** 仅恢复目标缺失的单条补充记录；转换队列归属并保留上传票据，不改正文或图片。 */
+    fun recoverMissingAppend(scope: String, id: String): String {
+        var target = ""
+        mutate { db ->
+            val rows = queue(scope).filter { it.postId == id }
+            val first = rows.firstOrNull() ?: error("没有待同步记录")
+            val detail = get(scope, id) ?: error("笔记未缓存")
+            val failure = statuses(scope)[id].orEmpty()
+            require(first.blocked && first.change.kind == "append" && failure.contains("404"))
+            require(
+                rows.count { it.change.kind == "append" } == 1 &&
+                    rows.all { it.change.kind in listOf("append", "edit") } &&
+                    detail.messages.size == 1
+            )
+            val draft = requireNotNull(first.change.draft).copy(postId = null)
+            target = draft.id
+            require(get(scope, target) == null)
+            val post = detail.post.copy(id = UUID.fromString(target))
+            put(db, scope, post, DisplayPost(post, detail.messages))
+            db.execSQL(
+                "UPDATE outbox SET post_id=?,blocked=0,error=NULL WHERE scope=? AND post_id=?",
+                arrayOf(target, scope, id),
+            )
+            db.execSQL(
+                "UPDATE outbox SET payload=? WHERE seq=?",
+                arrayOf(codec.encodeToString(PendingChange("create", draft = draft)), first.seq),
+            )
+            db.delete("notes", "scope=? AND id=?", arrayOf(scope, id))
+        }
+        return target
+    }
+
     /** 本地覆盖正文并排队，仍保留已有图片，不保留历史版本用于展示。 */
     fun edit(scope: String, id: String, messageId: String, text: String) {
         mutate { db ->

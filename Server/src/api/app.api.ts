@@ -4,7 +4,7 @@
  */
 import { registerAsrApi } from "./asr.api.js";
 import type { AsrOptions } from "../modules/asr/asr.session.js";
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { bodyLimit } from "hono/body-limit";
@@ -36,6 +36,24 @@ export function createApp(services: Services, token: string, asr?: AsrOptions) {
   app.openAPIRegistry.registerComponent("securitySchemes", "bearerAuth", {
     type: "http",
     scheme: "bearer",
+  });
+  /** API 失败只记录请求路径、状态和耗时，不记录正文、令牌或签名链接。 */
+  app.use("/api/*", async (c, next) => {
+    const requestId = randomUUID();
+    const start = Date.now();
+    c.header("X-Request-ID", requestId);
+    await next();
+    if (c.res.status >= 400)
+      console.warn(
+        JSON.stringify({
+          event: "api_failure",
+          request_id: requestId,
+          method: c.req.method,
+          path: c.req.path,
+          status: c.res.status,
+          duration_ms: Date.now() - start,
+        }),
+      );
   });
   app.use("/api/*", async (c, next) => {
     const supplied = Buffer.from(c.req.header("Authorization") ?? "");
