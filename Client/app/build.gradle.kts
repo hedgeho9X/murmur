@@ -5,15 +5,33 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+val defaultApiUrl = providers.gradleProperty("murmurApiUrl").orElse("http://127.0.0.1:8787/")
+
 android {
     namespace = "cn.hedgeho9.murmur"
     compileSdk = 36
-    defaultConfig { applicationId = "cn.hedgeho9.murmur"; minSdk = 26; targetSdk = 36; versionCode = 1; versionName = "0.1.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
-    buildFeatures { compose = true }
-    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    defaultConfig {
+        buildConfigField("String", "DEFAULT_API_URL", "\"${defaultApiUrl.get()}\"")
+        applicationId = "cn.hedgeho9.murmur"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     kotlinOptions { jvmTarget = "17" }
     packaging { resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1") }
 }
+
 dependencies {
     implementation(project(":api"))
     implementation("androidx.exifinterface:exifinterface:1.4.1")

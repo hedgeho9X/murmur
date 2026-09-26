@@ -49,3 +49,5 @@ adb reverse tcp:59000 tcp:59000 # 转发签名 URL 使用的本地 S3
 生成接口：在 Server/ 运行 `npm run codegen`。`api/src/main` 不手工修改；供应商 WS 协议由 `SpeechRecorder.kt` 单独实现。
 
 验收范围见 [docs/acceptance.md](docs/acceptance.md)。REST API、ASR 事件 DTO 和路径均由 Server OpenAPI 生成，手写层仅组织业务调用、设备采集及 WebSocket 生命周期。
+
+构建局域网体验包时可传 Gradle 参数 `-PmurmurApiUrl=http://你的局域网IP:8787/`，它只设置首次使用的默认地址；设置中已保存的地址优先，API 令牌仍需自行填写，不嵌入 APK。

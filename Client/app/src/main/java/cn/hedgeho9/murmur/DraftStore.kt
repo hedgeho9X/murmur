@@ -71,7 +71,7 @@ class DraftStore(private val context: Context) {
     }
 
     /** 返回固定连接地址，初始值用于 adb reverse 的本地开发链路。 */
-    fun baseUrl(): String = prefs.getString("url", "http://127.0.0.1:8787/")!!
+    fun baseUrl(): String = prefs.getString("url", BuildConfig.DEFAULT_API_URL)!!
 
     /** 通过 Keystore 解密 API 令牌；密钥丢失时要求用户重新配置。 */
     fun token(): String {
