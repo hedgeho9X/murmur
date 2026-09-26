@@ -1,0 +1,6 @@
+node_modules/
+.env
+*.log
+clients/kotlin/.gradle/
+clients/kotlin/build/
+.DS_Store
