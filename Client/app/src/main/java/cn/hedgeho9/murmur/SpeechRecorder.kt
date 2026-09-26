@@ -36,11 +36,17 @@ class SpeechRecorder(
     private val onComplete: () -> Unit,
     private val onError: (String) -> Unit,
 ) {
-    private val client =
-        OkHttpClient.Builder()
-            .readTimeout(0, TimeUnit.MILLISECONDS)
-            .pingInterval(15, TimeUnit.SECONDS)
-            .build()
+    companion object {
+        // 多次录音复用 TLS 会话和调度器；取消录音只关闭自己的 WebSocket。
+        private val sharedClient =
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(0, TimeUnit.MILLISECONDS)
+                .pingInterval(15, TimeUnit.SECONDS)
+                .build()
+    }
+
+    private val client = sharedClient
     private val assembler = TranscriptAssembler()
     private var ws: WebSocket? = null
     private var audio: AudioRecord? = null
@@ -137,8 +143,6 @@ class SpeechRecorder(
                                         onText(e.value.text)
                                         onComplete()
                                         webSocket.close(1000, "done")
-                                        client.dispatcher.executorService.shutdown()
-                                        client.connectionPool.evictAll()
                                     }
                                     is AsrServerEvent.ErrorWrapper -> fail("识别失败：${e.value.code}")
                                 }
@@ -255,8 +259,6 @@ class SpeechRecorder(
         } catch (_: Exception) {}
         ws?.cancel()
         pending.clear()
-        client.dispatcher.executorService.shutdown()
-        client.connectionPool.evictAll()
     }
 
     /** 仅通知一次失败并释放录音与连接。 */

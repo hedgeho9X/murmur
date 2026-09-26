@@ -8,6 +8,7 @@ import cn.hedgeho9.murmur.api.infrastructure.Serializer
 import cn.hedgeho9.murmur.api.models.*
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -34,7 +35,18 @@ data class DisplayPost(val post: Post, val messages: List<DisplayMessage>)
 
 /** 接口仓储负责生成 DTO、上传字节和错误归因；重试由草稿保存的 ID 决定。 */
 class MurmurApi(base: String, token: String) {
-    private val transport = OkHttpClient.Builder().build()
+    companion object {
+        // API 与签名上传共享连接池；认证拦截器仅添加到单个 API 客户端，不能进入 S3 上传请求。
+        private val sharedTransport =
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(45, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
+                .callTimeout(90, TimeUnit.SECONDS)
+                .build()
+    }
+
+    private val transport = sharedTransport
     private val client =
         ApiClient(
                 baseUrl = base,
