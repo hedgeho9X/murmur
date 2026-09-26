@@ -15,3 +15,5 @@ Client/build/
 
 # 私人笔记截图仅保留在本地设计参考目录。
 ref/*.jpg
+
+Server/dist/

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "include": [
+    "src",
+    "scripts/migrate.ts",
+    "scripts/storage-init.ts",
+    "scripts/reindex-tags.ts",
+    "scripts/bootstrap.ts"
+  ]
+}

@@ -15,7 +15,8 @@
     "test": "tsx --env-file=.env --test --test-concurrency=1 tests/*.test.ts",
     "test:kotlin": "tsx --env-file=.env scripts/test-kotlin.ts",
     "format": "prettier --write src scripts tests drizzle.config.ts",
-    "tags:reindex": "tsx --env-file=.env scripts/reindex-tags.ts"
+    "tags:reindex": "tsx --env-file=.env scripts/reindex-tags.ts",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1141.0",

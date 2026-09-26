@@ -1,0 +1,78 @@
+# Compose 路径基于 Server 目录；API 与 S3 域名在面板绑定，不暴露宿主机端口。
+x-api: &api
+  image: murmur-api:${IMAGE_TAG:-local}
+  build:
+    context: ..
+    dockerfile: Server/Dockerfile
+  environment: &environment
+    NODE_ENV: production
+    HOST: 0.0.0.0
+    PORT: 8787
+    DATABASE_URL: postgresql://murmur:${POSTGRES_PASSWORD:?required}@postgres:5432/murmur
+    API_TOKEN: ${API_TOKEN:?required}
+    S3_ENDPOINT: http://murmur-storage-internal:9000
+    S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?required}
+    S3_ACCESS_KEY: ${S3_ACCESS_KEY:?required}
+    S3_SECRET_KEY: ${S3_SECRET_KEY:?required}
+    S3_BUCKET: ${S3_BUCKET:-murmur}
+    S3_REGION: us-east-1
+    ASR_API_KEY: ${ASR_API_KEY:-}
+    ASR_ENDPOINT: ${ASR_ENDPOINT:-wss://dashscope.aliyuncs.com/api-ws/v1/inference}
+    ASR_MODEL: ${ASR_MODEL:-qwen-audio-3.0-asr-flash-streaming}
+
+services:
+  api:
+    <<: *api
+    restart: unless-stopped
+    depends_on:
+      initialize:
+        condition: service_completed_successfully
+    networks: [default, dokploy-network]
+    stop_grace_period: 35s
+
+  initialize:
+    <<: *api
+    restart: "no"
+    healthcheck:
+      disable: true
+    command: ["node", "dist/scripts/bootstrap.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      storage:
+        condition: service_started
+
+  postgres:
+    image: postgres:17.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: murmur
+      POSTGRES_USER: murmur
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes: ["postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U murmur -d murmur"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  storage:
+    image: rustfs/rustfs@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:?required}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:?required}
+      RUSTFS_CONSOLE_ENABLE: "false"
+    volumes: ["storage:/data"]
+    networks:
+      default:
+        aliases: [murmur-storage-internal]
+      dokploy-network: {}
+
+volumes:
+  postgres:
+  storage:
+
+networks:
+  dokploy-network:
+    external: true

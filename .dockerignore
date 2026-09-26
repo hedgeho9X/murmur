@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/dist
+**/build
+**/.gradle
+**/*.log
+Client
+ref
