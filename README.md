@@ -22,27 +22,30 @@ npm run dev # 启动 Hono，默认仅本机可访问
 
 ## 接口
 
-| 方法 | 路径 | 行为 |
-|---|---|---|
-| POST | /api/v1/posts | 原子创建帖子和第一条 user 消息；必带 Idempotency-Key |
-| GET | /api/v1/posts | limit/cursor 分页 |
-| GET | /api/v1/posts/{id} | 帖子及有序消息 |
-| PATCH | /api/v1/posts/{id} | 仅修改 title，null 清空 |
-| DELETE | /api/v1/posts/{id} | 级联删除，重复删除返回 204 |
-| POST | /api/v1/images/uploads | 幂等申请签名 PUT，必带 Idempotency-Key |
-| POST | /api/v1/images/{id}/complete | 校验真实图片并完成上传，重复调用安全 |
-| GET | /api/v1/images/{id}/url | ready 图片的临时读取地址 |
+| 方法   | 路径                         | 行为                                                 |
+| ------ | ---------------------------- | ---------------------------------------------------- |
+| POST   | /api/v1/posts                | 原子创建帖子和第一条 user 消息；必带 Idempotency-Key |
+| GET    | /api/v1/posts                | limit/cursor 分页                                    |
+| GET    | /api/v1/posts/{id}           | 帖子及有序消息                                       |
+| PATCH  | /api/v1/posts/{id}           | 仅修改 title，null 清空                              |
+| DELETE | /api/v1/posts/{id}           | 级联删除，重复删除返回 204                           |
+| POST   | /api/v1/images/uploads       | 幂等申请签名 PUT，必带 Idempotency-Key               |
+| POST   | /api/v1/images/{id}/complete | 校验真实图片并完成上传，重复调用安全                 |
+| GET    | /api/v1/images/{id}/url      | ready 图片的临时读取地址                             |
 
 创建帖子请求示例（JSONC，去掉注释后发送）：
 
 ```jsonc
-{ // 创建帖子及第一条用户消息
+{
+  // 创建帖子及第一条用户消息
   "title": "一个想法", // 可省略或传 null
-  "content": { // 消息内容
-    "parts": [ // 顺序即展示顺序
-      { "type": "text", "text": "先记录，再一起思考" } // 支持纯文本发帖
-    ] // 图片块使用 type=image、image_id=已完成上传的ID
-  } // 不传 role、turn_id 或客户端时间
+  "content": {
+    // 消息内容
+    "parts": [
+      // 顺序即展示顺序
+      { "type": "text", "text": "先记录，再一起思考" }, // 支持纯文本发帖
+    ], // 图片块使用 type=image、image_id=已完成上传的ID
+  }, // 不传 role、turn_id 或客户端时间
 } // 重试必须复用原 Idempotency-Key
 ```
 

@@ -1,25 +1,151 @@
 /** Public JSON contracts shared by request validation, Scalar and Kotlin generation. */
-import { z } from '@hono/zod-openapi';
+import { z } from "@hono/zod-openapi";
 export const Id = z.string().uuid();
-export const TextPart = z.object({ type: z.literal('text'), text: z.string().max(100_000) }).strict().openapi('TextPart');
-export const ImagePart = z.object({ type: z.literal('image'), image_id: Id }).strict().openapi('ImagePart');
-export const ToolCallPart = z.object({ type: z.literal('tool_call'), id: z.string().min(1), name: z.string().min(1), arguments: z.record(z.string(), z.unknown()) }).strict().openapi('ToolCallPart');
-export const JsonPart = z.object({ type: z.literal('json'), data: z.any().refine(value => value !== undefined, 'JSON data is required').openapi({ description: 'Any JSON value' }) }).strict().openapi('JsonPart');
-export const UserContent = z.object({ parts: z.array(z.discriminatedUnion('type', [TextPart, ImagePart])).min(1).max(30) }).strict().openapi('UserContent');
-export const AssistantContent = z.object({ parts: z.array(z.discriminatedUnion('type', [TextPart, ImagePart, ToolCallPart])), finish_reason: z.enum(['stop', 'tool_call', 'interrupted', 'error']) }).strict().openapi('AssistantContent');
-export const ToolContent = z.object({ parts: z.array(z.discriminatedUnion('type', [TextPart, ImagePart, JsonPart])), is_error: z.boolean() }).strict().openapi('ToolContent');
-const common = { id: Id, post_id: Id, turn_id: Id, created_at: z.string().datetime() };
-export const UserMessage = z.object({ ...common, role: z.literal('user'), content: UserContent, tool_call_id: z.null() }).openapi('UserMessage');
-export const AssistantMessage = z.object({ ...common, role: z.literal('assistant'), content: AssistantContent, tool_call_id: z.null() }).openapi('AssistantMessage');
-export const ToolMessage = z.object({ ...common, role: z.literal('tool'), content: ToolContent, tool_call_id: z.string().min(1) }).openapi('ToolMessage');
-export const Message = z.discriminatedUnion('role', [UserMessage, AssistantMessage, ToolMessage]).openapi('Message');
-export const Post = z.object({ id: Id, title: z.string().nullable(), created_at: z.string().datetime(), updated_at: z.string().datetime() }).openapi('Post');
-export const CreatePost = z.object({ title: z.string().trim().min(1).max(200).nullable().optional(), content: UserContent }).strict().openapi('CreatePostRequest');
-export const CreatedPost = z.object({ post: Post, message: UserMessage }).openapi('CreatedPost');
-export const PostDetail = z.object({ post: Post, messages: z.array(Message) }).openapi('PostDetail');
-export const ErrorResponse = z.object({ error: z.object({ code: z.string(), message: z.string() }) }).openapi('ErrorResponse');
-export const Image = z.object({ id: Id, content_type: z.string(), size_bytes: z.number().int(), width: z.number().int().nullable(), height: z.number().int().nullable(), status: z.enum(['pending', 'ready']), created_at: z.string().datetime() }).openapi('Image');
-export const UploadRequest = z.object({ content_type: z.enum(['image/jpeg', 'image/png', 'image/webp']), size_bytes: z.number().int().min(1).max(10 * 1024 * 1024) }).strict().openapi('UploadRequest');
-export const UploadResponse = z.object({ image: Image, upload_url: z.string().url(), expires_in: z.number().int() }).openapi('UploadResponse');
-export const KeyHeader = z.object({ 'Idempotency-Key': z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/) });
+export const TextPart = z
+  .object({ type: z.literal("text"), text: z.string().max(100_000) })
+  .strict()
+  .openapi("TextPart");
+export const ImagePart = z
+  .object({ type: z.literal("image"), image_id: Id })
+  .strict()
+  .openapi("ImagePart");
+export const ToolCallPart = z
+  .object({
+    type: z.literal("tool_call"),
+    id: z.string().min(1),
+    name: z.string().min(1),
+    arguments: z.record(z.string(), z.unknown()),
+  })
+  .strict()
+  .openapi("ToolCallPart");
+export const JsonPart = z
+  .object({
+    type: z.literal("json"),
+    data: z
+      .any()
+      .refine((value) => value !== undefined, "JSON data is required")
+      .openapi({ description: "Any JSON value" }),
+  })
+  .strict()
+  .openapi("JsonPart");
+export const UserContent = z
+  .object({
+    parts: z
+      .array(z.discriminatedUnion("type", [TextPart, ImagePart]))
+      .min(1)
+      .max(30),
+  })
+  .strict()
+  .openapi("UserContent");
+export const AssistantContent = z
+  .object({
+    parts: z.array(
+      z.discriminatedUnion("type", [TextPart, ImagePart, ToolCallPart]),
+    ),
+    finish_reason: z.enum(["stop", "tool_call", "interrupted", "error"]),
+  })
+  .strict()
+  .openapi("AssistantContent");
+export const ToolContent = z
+  .object({
+    parts: z.array(
+      z.discriminatedUnion("type", [TextPart, ImagePart, JsonPart]),
+    ),
+    is_error: z.boolean(),
+  })
+  .strict()
+  .openapi("ToolContent");
+const common = {
+  id: Id,
+  post_id: Id,
+  turn_id: Id,
+  created_at: z.string().datetime(),
+};
+export const UserMessage = z
+  .object({
+    ...common,
+    role: z.literal("user"),
+    content: UserContent,
+    tool_call_id: z.null(),
+  })
+  .openapi("UserMessage");
+export const AssistantMessage = z
+  .object({
+    ...common,
+    role: z.literal("assistant"),
+    content: AssistantContent,
+    tool_call_id: z.null(),
+  })
+  .openapi("AssistantMessage");
+export const ToolMessage = z
+  .object({
+    ...common,
+    role: z.literal("tool"),
+    content: ToolContent,
+    tool_call_id: z.string().min(1),
+  })
+  .openapi("ToolMessage");
+export const Message = z
+  .discriminatedUnion("role", [UserMessage, AssistantMessage, ToolMessage])
+  .openapi("Message");
+export const Post = z
+  .object({
+    id: Id,
+    title: z.string().nullable(),
+    created_at: z.string().datetime(),
+    updated_at: z.string().datetime(),
+  })
+  .openapi("Post");
+export const CreatePost = z
+  .object({
+    title: z.string().trim().min(1).max(200).nullable().optional(),
+    content: UserContent,
+  })
+  .strict()
+  .openapi("CreatePostRequest");
+export const CreatedPost = z
+  .object({ post: Post, message: UserMessage })
+  .openapi("CreatedPost");
+export const PostDetail = z
+  .object({ post: Post, messages: z.array(Message) })
+  .openapi("PostDetail");
+export const ErrorResponse = z
+  .object({ error: z.object({ code: z.string(), message: z.string() }) })
+  .openapi("ErrorResponse");
+export const Image = z
+  .object({
+    id: Id,
+    content_type: z.string(),
+    size_bytes: z.number().int(),
+    width: z.number().int().nullable(),
+    height: z.number().int().nullable(),
+    status: z.enum(["pending", "ready"]),
+    created_at: z.string().datetime(),
+  })
+  .openapi("Image");
+export const UploadRequest = z
+  .object({
+    content_type: z.enum(["image/jpeg", "image/png", "image/webp"]),
+    size_bytes: z
+      .number()
+      .int()
+      .min(1)
+      .max(10 * 1024 * 1024),
+  })
+  .strict()
+  .openapi("UploadRequest");
+export const UploadResponse = z
+  .object({
+    image: Image,
+    upload_url: z.string().url(),
+    expires_in: z.number().int(),
+  })
+  .openapi("UploadResponse");
+export const KeyHeader = z.object({
+  "Idempotency-Key": z
+    .string()
+    .min(8)
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]+$/),
+});
 export type NewPost = z.infer<typeof CreatePost>;

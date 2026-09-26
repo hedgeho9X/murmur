@@ -1,0 +1,16 @@
+{
+  "library": "jvm-retrofit2",
+  "serializationLibrary": "kotlinx_serialization",
+  "useCoroutines": true,
+  "generateOneOfAnyOfWrappers": true,
+  "packageName": "cn.hedgeho9.myapp.api",
+  "dateLibrary": "string",
+  "hideGenerationTimestamp": true,
+  "typeMappings": {
+    "AnyType": "JsonElement",
+    "object": "JsonElement"
+  },
+  "importMappings": {
+    "JsonElement": "kotlinx.serialization.json.JsonElement"
+  }
+}
