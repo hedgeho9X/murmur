@@ -72,3 +72,20 @@ jobs:
       - name: Stop development services
         if: always()
         run: docker compose down
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: Build and verify Android
+        working-directory: Client
+        run: sh gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: murmur-debug-apk
+          path: Client/app/build/outputs/apk/debug/app-debug.apk

@@ -2,6 +2,7 @@
  * 管理单次录音对应的上游 WebSocket 和识别片段，向客户端发送统一事件。
  * 不保存音频或创建帖子；客户端断开时立即终止上游，防止遗留计费任务。
  */
+import { AsrClientEvent, type ServerEvent } from "./asr.contracts.js";
 import { randomUUID } from "node:crypto";
 import WebSocket from "ws";
 /** 单次识别依赖的服务端配置；密钥不得发送到客户端。 */
@@ -26,7 +27,7 @@ export class AsrSession {
   /** 注入配置、客户端发送/关闭函数和资源释放回调；构造不连接供应商。 */
   constructor(
     private options: AsrOptions,
-    private send: (event: object) => void,
+    private send: (event: ServerEvent) => void,
     private close: () => void,
     private release: () => void,
   ) {
@@ -61,7 +62,7 @@ export class AsrSession {
     }
     let message: Record<string, unknown>;
     try {
-      message = JSON.parse(data);
+      message = AsrClientEvent.parse(JSON.parse(data));
       if (!message || typeof message !== "object") throw Error();
     } catch {
       return this.fail("INVALID_CONTROL", "Expected a JSON control message");

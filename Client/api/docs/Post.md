@@ -8,6 +8,7 @@
 | **title** | **kotlin.String** |  |  |
 | **createdAt** | **kotlin.String** |  |  |
 | **updatedAt** | **kotlin.String** |  |  |
+| **preview** | **kotlin.String** |  |  [optional] |
 
 
 

@@ -11,7 +11,7 @@
     "storage:init": "tsx --env-file=.env scripts/storage-init.ts",
     "storage:cleanup": "tsx --env-file=.env scripts/cleanup.ts",
     "openapi": "tsx scripts/openapi.ts",
-    "codegen": "npm run openapi && openapi-generator-cli generate -i openapi/openapi.json -g kotlin -o ../Client/api -c ../Client/codegen.json --global-property apiTests=false,modelTests=false",
+    "codegen": "npm run openapi && openapi-generator-cli generate -i openapi/openapi.json -g kotlin -o ../Client/api -c ../Client/codegen.json --global-property apiTests=false,modelTests=false && tsx scripts/api-paths.ts",
     "test": "tsx --env-file=.env --test --test-concurrency=1 tests/*.test.ts",
     "test:kotlin": "tsx --env-file=.env scripts/test-kotlin.ts",
     "format": "prettier --write src scripts tests drizzle.config.ts"

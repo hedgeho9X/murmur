@@ -33,6 +33,8 @@ const listPostsRoute = createRoute({
     query: z.object({
       limit: z.coerce.number().int().min(1).max(100).default(20),
       cursor: z.string().max(512).optional(),
+      q: z.string().trim().max(200).optional(),
+      images_only: z.enum(["true", "false"]).optional(),
     }),
   },
   responses: {
@@ -143,7 +145,10 @@ export function registerPostsApi(app: OpenAPIHono, service: PostsService) {
    */
   app.openapi(listPostsRoute, async (c) => {
     const q = c.req.valid("query");
-    return c.json(await service.list(q.limit, q.cursor), 200);
+    return c.json(
+      await service.list(q.limit, q.cursor, q.q, q.images_only === "true"),
+      200,
+    );
   });
   /**
    * GET /api/v1/posts/{id}

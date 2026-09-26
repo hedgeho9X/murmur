@@ -27,6 +27,7 @@ import kotlinx.serialization.Contextual
  * @param title 
  * @param createdAt 
  * @param updatedAt 
+ * @param preview 
  */
 @Serializable
 
@@ -42,7 +43,10 @@ data class Post (
     val createdAt: kotlin.String,
 
     @SerialName(value = "updated_at")
-    val updatedAt: kotlin.String
+    val updatedAt: kotlin.String,
+
+    @SerialName(value = "preview")
+    val preview: kotlin.String? = null
 
 ) {
 

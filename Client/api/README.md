@@ -61,6 +61,15 @@ All URIs are relative to *http://localhost*
 ## Documentation for Models
 
  - [cn.hedgeho9.murmur.api.models.AppendMessageRequest](docs/AppendMessageRequest.md)
+ - [cn.hedgeho9.murmur.api.models.AsrCancel](docs/AsrCancel.md)
+ - [cn.hedgeho9.murmur.api.models.AsrClientEvent](docs/AsrClientEvent.md)
+ - [cn.hedgeho9.murmur.api.models.AsrCompleted](docs/AsrCompleted.md)
+ - [cn.hedgeho9.murmur.api.models.AsrError](docs/AsrError.md)
+ - [cn.hedgeho9.murmur.api.models.AsrFinish](docs/AsrFinish.md)
+ - [cn.hedgeho9.murmur.api.models.AsrReady](docs/AsrReady.md)
+ - [cn.hedgeho9.murmur.api.models.AsrServerEvent](docs/AsrServerEvent.md)
+ - [cn.hedgeho9.murmur.api.models.AsrStart](docs/AsrStart.md)
+ - [cn.hedgeho9.murmur.api.models.AsrTranscript](docs/AsrTranscript.md)
  - [cn.hedgeho9.murmur.api.models.AssistantContent](docs/AssistantContent.md)
  - [cn.hedgeho9.murmur.api.models.AssistantContentPartsInner](docs/AssistantContentPartsInner.md)
  - [cn.hedgeho9.murmur.api.models.AssistantMessage](docs/AssistantMessage.md)

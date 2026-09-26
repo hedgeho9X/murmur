@@ -189,17 +189,21 @@ apiClient.setBearerToken("TOKEN")
 val webService = apiClient.createWebservice(PostsApi::class.java)
 val limit : kotlin.Int = 56 // kotlin.Int | 
 val cursor : kotlin.String = cursor_example // kotlin.String | 
+val q : kotlin.String = q_example // kotlin.String | 
+val imagesOnly : kotlin.String = imagesOnly_example // kotlin.String | 
 
 launch(Dispatchers.IO) {
-    val result : PostPage = webService.listPosts(limit, cursor)
+    val result : PostPage = webService.listPosts(limit, cursor, q, imagesOnly)
 }
 ```
 
 ### Parameters
 | **limit** | **kotlin.Int**|  | [optional] [default to 20] |
+| **cursor** | **kotlin.String**|  | [optional] |
+| **q** | **kotlin.String**|  | [optional] |
 | Name | Type | Description  | Notes |
 | ------------- | ------------- | ------------- | ------------- |
-| **cursor** | **kotlin.String**|  | [optional] |
+| **imagesOnly** | **kotlin.String**|  | [optional] [enum: true, false] |
 
 ### Return type
 

@@ -29,3 +29,12 @@
 ## UUIDv7 创建接口
 
 新增迁移先删除回执清理触发器及函数，再删除 idempotency 表；旧迁移保留作为历史账本。当前创建接口不接收 Idempotency-Key。新建请求缺少 ID 或提供 UUIDv4 时返回 422。图片上传每次分配独立 ID，完成操作仍可安全重复执行。
+
+## Android 与 ASR 第一版
+
+- 13 项后端测试通过，新增真实本地 WebSocket 转发、认证、片段身份、尾部完成、无效控制帧、追加消息和关键词/图片筛选。
+- Qwen 真实调用经过本项目 Hono 转发：8.84 秒中文合成音频，首次文字 344ms、结束到完成 297ms，完整结尾保留；不是 Android 麦克风的准确率评测。
+- Android assembleDebug、2 项单元测试和 lintDebug 通过（0 errors，仍有 warnings）。
+- Android API 35 模拟器实际安装：连接设置、键盘编辑、杀进程后的草稿恢复、创建帖子、读取详情、追加消息均通过。
+- REST 接口、DTO、ASR 双向事件类型及 WebSocket 路径从 OpenAPI 生成。相机/AudioRecord/WebSocket 生命周期是手写设备与传输代码。
+- 尚未验证物理 Android 设备、真人口音、噪声、长录音及公网移动网络。Hermes 自动回复尚未接入。

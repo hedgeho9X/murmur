@@ -3,7 +3,7 @@
  * 只处理查询、事务快照和关系删除；内容校验与分页编码由服务负责。
  */
 import { randomUUID } from "node:crypto";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc, and, getTableColumns } from "drizzle-orm";
 import type { DB, Tx } from "../../database/database.client.js";
 import { posts, messages } from "../../database/schemas/index.js";
 import type { NewPost, NewMessage } from "./posts.contracts.js";
@@ -104,14 +104,23 @@ export class PostsRepository {
    * 根据页大小和可选边界读取倒序帖子，多取一条以判断是否还有下一页。
    * 返回数据库行，不生成游标或修改数据。
    */
-  list(limit: number, cursor?: PostCursor) {
+  list(limit: number, cursor?: PostCursor, query?: string, imagesOnly = false) {
     const boundary = cursor
       ? sql`(${posts.created_at}, ${posts.id}) < (${cursor.t}::timestamptz, ${cursor.id}::uuid)`
       : undefined;
+    const match = query
+      ? sql`(${posts.title} ilike ${"%" + query.replace(/[\\%_]/g, "\\$&") + "%"} or exists(select 1 from messages m, jsonb_array_elements(m.content->'parts') part where m.post_id=${posts.id} and part->>'type'='text' and position(lower(${query}) in lower(part->>'text'))>0))`
+      : undefined;
+    const imageFilter = imagesOnly
+      ? sql`exists(select 1 from messages m, jsonb_array_elements(m.content->'parts') part where m.post_id=${posts.id} and part->>'type'='image')`
+      : undefined;
     return this.db
-      .select()
+      .select({
+        ...getTableColumns(posts),
+        preview: sql<string>`coalesce((select left(string_agg(part->>'text', ' ' order by m.created_at,m.id,ordinality),160) from messages m, jsonb_array_elements(m.content->'parts') with ordinality as blocks(part,ordinality) where m.post_id=posts.id and m.role='user' and part->>'type'='text'),'')`,
+      })
       .from(posts)
-      .where(boundary)
+      .where(and(boundary, match, imageFilter))
       .orderBy(desc(posts.created_at), desc(posts.id))
       .limit(limit + 1);
   }

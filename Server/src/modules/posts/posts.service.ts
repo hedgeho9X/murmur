@@ -90,7 +90,12 @@ export class PostsService {
    * 校验并解码游标，读取一页帖子并生成下一页游标，返回 JSON 响应数据。
    * 非法游标返回 400；本操作不修改帖子。
    */
-  async list(limit: number, cursor?: string) {
+  async list(
+    limit: number,
+    cursor?: string,
+    query?: string,
+    imagesOnly = false,
+  ) {
     let boundary: PostCursor | undefined;
     if (cursor) {
       try {
@@ -110,7 +115,7 @@ export class PostsService {
         throw new ApiError(400, "INVALID_CURSOR", "Invalid pagination cursor");
       }
     }
-    const rows = await this.posts.list(limit, boundary);
+    const rows = await this.posts.list(limit, boundary, query, imagesOnly);
     const items = rows.slice(0, limit);
     const last = items.at(-1);
     return wire({

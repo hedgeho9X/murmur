@@ -18,3 +18,5 @@
 通过 Hono → Qwen 的本地真实测试（8.84 秒中文合成音频）得到首次文字 344ms、结束发送到完成 297ms，最后一句完整。此记录验证协议，不代表真机或网络环境的固定延迟。
 
 OpenAPI 只描述升级入口，双向事件协议以上述说明为准。生成的 Retrofit ASRApi 不是 WebSocket 客户端；Android 使用独立的 SpeechRecorder 实现连接。
+
+客户端的 JSON 事件类型由 `asr.contracts.ts → OpenAPI → Kotlin` 生成；`api-paths.ts` 从同一份 OpenAPI 生成 ApiPaths。WebSocket 的握手、二进制发送和生命周期仍由传输层实现，不能用普通 Retrofit GET 替代升级连接。

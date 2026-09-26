@@ -422,3 +422,27 @@ test("append keeps original messages immutable and rejects duplicate message IDs
     created.message,
   );
 });
+
+test("post list searches actual text, returns preview and filters images", async () => {
+  const marker = `搜索${uuidv7()}`;
+  const result = await json(
+    await request("/api/v1/posts", "POST", {
+      content: { parts: [{ type: "text", text: marker }] },
+    }),
+    201,
+  );
+  const page = await json(
+    await request(`/api/v1/posts?q=${encodeURIComponent(marker)}`),
+    200,
+  );
+  assert.equal(page.items.length, 1);
+  assert.equal(page.items[0].id, result.post.id);
+  assert.equal(page.items[0].preview, marker);
+  const filtered = await json(
+    await request(
+      `/api/v1/posts?q=${encodeURIComponent(marker)}&images_only=true`,
+    ),
+    200,
+  );
+  assert.equal(filtered.items.length, 0);
+});

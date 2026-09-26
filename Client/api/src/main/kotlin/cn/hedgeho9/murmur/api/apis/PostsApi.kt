@@ -103,6 +103,16 @@ interface PostsApi {
     @GET("api/v1/posts/{id}")
     suspend fun getPost(@Path("id") id: java.util.UUID): Response<PostDetail>
 
+
+    /**
+    * enum for parameter imagesOnly
+    */
+    @Serializable
+    enum class ImagesOnlyListPosts(val value: kotlin.String) {
+        @SerialName(value = "true") `true`("true"),
+        @SerialName(value = "false") `false`("false")
+    }
+
     /**
      * GET api/v1/posts
      * 
@@ -120,10 +130,12 @@ interface PostsApi {
      *
      * @param limit  (optional, default to 20)
      * @param cursor  (optional)
+     * @param q  (optional)
+     * @param imagesOnly  (optional)
      * @return [PostPage]
      */
     @GET("api/v1/posts")
-    suspend fun listPosts(@Query("limit") limit: kotlin.Int? = 20, @Query("cursor") cursor: kotlin.String? = null): Response<PostPage>
+    suspend fun listPosts(@Query("limit") limit: kotlin.Int? = 20, @Query("cursor") cursor: kotlin.String? = null, @Query("q") q: kotlin.String? = null, @Query("images_only") imagesOnly: ImagesOnlyListPosts? = null): Response<PostPage>
 
     /**
      * PATCH api/v1/posts/{id}

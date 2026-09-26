@@ -13,6 +13,7 @@ export const Post = z
   .object({
     id: Id,
     title: z.string().nullable(),
+    preview: z.string().optional(),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
   })

@@ -1,17 +1,51 @@
-# Murmur Client
+# Murmur Android
 
-客户端使用 Kotlin，仅面向 Android。当前尚未创建 Android App/UI 模块。
+Kotlin 原生 Android 客户端，Compose UI；最低 Android 8（API 26）。
 
-- `api/`：由 OpenAPI Generator 生成的 Kotlin JVM 模块，使用 Retrofit、coroutines 和 kotlinx.serialization，后续可接入 Android。
-- `api/src/test/kotlin/cn/hedgeho9/murmur/contract/`：手写 JSON/真实 HTTP 契约测试。
-- `codegen.json`：Kotlin 客户端生成配置。生成的 `api/src/main` 不手工修改。
+## 目录
 
-API 契约源位于 `../Server/openapi/openapi.json`。在 `Server/` 运行 `npm run codegen` 重新生成；生成器版本固定在 `Server/openapitools.json`。
+- `app/`：取景、CameraX 拍照、AudioRecord 录音、ASR WebSocket、可恢复草稿和帖子浏览。
+- `api/`：由 OpenAPI Generator 生成的 Kotlin 接口与 DTO；手写 Gradle 配置同时支持独立测试及 App 子模块引用。
+- `prototype/`：用于交互讨论的 HTML 原型，仍使用模拟语音，与真实 Android 应用分开。
+- `docs/asr.md`：选型及流式显示说明。
 
-在 `Server/` 启动本地 API 后运行 `npm run test:kotlin`，脚本会把后端测试凭据通过环境传给 Gradle，不把密钥写入客户端文件。
+## 构建
 
-API 模块使用 `cn.hedgeho9.murmur.api` 包名，Gradle 项目名为 `murmur-api`。Android 的界面、状态管理、认证与重试策略由后续手写模块负责。
+需要 JDK 17、Android SDK 36。通过 Android Studio 打开本目录，或配置 `local.properties` 的 sdk.dir（不要提交个人路径）。
 
-## HTML 交互原型
+```sh
+sh gradlew :app:assembleDebug # 构建开发 APK
+sh gradlew :app:testDebugUnitTest :app:lintDebug # 验证合并逻辑、UUID 和静态问题
+```
 
-[prototype/](prototype/README.md) 提供记录流程的独立浏览器原型，包含拍照、长按进入模拟录音、草稿编辑与本地记录。它不连接 ASR 或业务后端，不替代后续 Kotlin App。
+产物位于 `app/build/outputs/apk/debug/app-debug.apk`。调试版允许 HTTP；正式构建要求 HTTPS。ASR 供应商凭据仅配置在 Server/.env，不写入客户端。
+
+## 连接开发服务
+
+先按 Server/README.md 启动服务、存储并填写 ASR_API_KEY。App 右上角连接设置填写后端地址和 API_TOKEN。令牌通过 Android Keystore AES-GCM 加密保存，草稿及附件存于应用私有目录，禁止系统备份。
+
+USB 真机或本机模拟器可以反向转发端口：
+
+```sh
+adb reverse tcp:8787 tcp:8787 # 转发 Hono
+adb reverse tcp:59000 tcp:59000 # 转发签名 URL 使用的本地 S3
+```
+
+此时 App 地址用 `http://127.0.0.1:8787/`。局域网真机需要 Server 的 HOST/STORAGE_BIND 和 S3_PUBLIC_ENDPOINT 都配置为手机可达地址；不能修改已经签名的 URL 主机名。
+
+## 已实现交互
+
+- 首页圆角方形取景；单击拍照、长按跳过拍照直接录音。相机权限未授予时点击相机入口授权。
+- 拍照后左侧录音、右侧铅笔；录音态无框、波形居中、下方只显示单行尾部转写，静音留白。
+- partial 按 segment_id 替换，final 定稿；完整正文持续保存。停止后等待 completed，再开放编辑。
+- 键盘和语音共用正文，底部编辑器支持相册多图；上传失败保留草稿及已上传资源 ID。
+- 帖子列表、正文预览、关键词搜索、照片筛选、详情、追加记录与级联删除。
+- 新帖子和追加消息均在草稿中生成一次 UUIDv7，重试沿用；消息不可编辑。
+
+## 范围
+
+本版完成记录与 ASR 链路，尚未连接 Hermes 生成回复。工具消息展示兼容已定义的数据库契约，但客户端不伪造助手响应。手机进入后台会停止采集并等待已有音频收尾，不提供后台录音。
+
+生成接口：在 Server/ 运行 `npm run codegen`。`api/src/main` 不手工修改；供应商 WS 协议由 `SpeechRecorder.kt` 单独实现。
+
+验收范围见 [docs/acceptance.md](docs/acceptance.md)。REST API、ASR 事件 DTO 和路径均由 Server OpenAPI 生成，手写层仅组织业务调用、设备采集及 WebSocket 生命周期。

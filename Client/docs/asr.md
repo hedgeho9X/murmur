@@ -28,3 +28,7 @@
 - HTML 原型使用固定文本模拟以上交互，未接入真实识别；不在前端保存供应商密钥。
 
 测试结论来源为同日独立任务的 asr-streaming-probe.json；本文件只收录非敏感结论，不包含业务空间地址或凭据。
+
+## 原生实现
+
+`SpeechRecorder.kt` 通过 AudioRecord 采集 16 kHz PCM16，使用生成的 AsrStart/AsrFinish/AsrServerEvent 及 ApiPaths.STREAM_ASR 接入后端。只缓存有上限的起始音频；ready 后按序转发，停止后等待 completed。画面静音取决于本地音量，不能根据是否收到 partial 判断。

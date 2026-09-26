@@ -12,6 +12,196 @@
       }
     },
     "schemas": {
+      "AsrClientEvent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AsrStart"
+          },
+          {
+            "$ref": "#/components/schemas/AsrFinish"
+          },
+          {
+            "$ref": "#/components/schemas/AsrCancel"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "start": "#/components/schemas/AsrStart",
+            "finish": "#/components/schemas/AsrFinish",
+            "cancel": "#/components/schemas/AsrCancel"
+          }
+        }
+      },
+      "AsrStart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "start"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "pcm_s16le"
+            ]
+          },
+          "sample_rate": {
+            "type": "integer",
+            "minimum": 16000,
+            "maximum": 16000
+          },
+          "channels": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "type",
+          "format",
+          "sample_rate",
+          "channels"
+        ],
+        "additionalProperties": false
+      },
+      "AsrFinish": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "finish"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "AsrCancel": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "cancel"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "AsrServerEvent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AsrReady"
+          },
+          {
+            "$ref": "#/components/schemas/AsrTranscript"
+          },
+          {
+            "$ref": "#/components/schemas/AsrCompleted"
+          },
+          {
+            "$ref": "#/components/schemas/AsrError"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "ready": "#/components/schemas/AsrReady",
+            "transcript": "#/components/schemas/AsrTranscript",
+            "completed": "#/components/schemas/AsrCompleted",
+            "error": "#/components/schemas/AsrError"
+          }
+        }
+      },
+      "AsrReady": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "ready"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "AsrTranscript": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "transcript"
+            ]
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "is_final": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "segment_id",
+          "text",
+          "is_final"
+        ]
+      },
+      "AsrCompleted": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ]
+      },
+      "AsrError": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "error"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "code",
+          "message"
+        ]
+      },
       "UserMessage": {
         "type": "object",
         "properties": {
@@ -190,6 +380,9 @@
           "title": {
             "type": "string",
             "nullable": true
+          },
+          "preview": {
+            "type": "string"
           },
           "created_at": {
             "type": "string",
@@ -918,6 +1111,27 @@
             },
             "required": false,
             "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "images_only",
             "in": "query"
           }
         ],
