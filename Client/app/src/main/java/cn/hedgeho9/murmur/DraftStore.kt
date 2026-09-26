@@ -52,6 +52,22 @@ class DraftStore(private val context: Context) {
     private val file = AtomicFile(File(context.filesDir, "draft.json"))
     private val prefs = context.getSharedPreferences("connection", Context.MODE_PRIVATE)
 
+    init {
+        if (BuildConfig.DEBUG) importDevelopmentConnection()
+    }
+
+    /** 仅开发版读取已授权 ADB 写入的私有配置，加密保存后立即删除临时明文。 */
+    private fun importDevelopmentConnection() {
+        val source = File(context.filesDir, "dev-connection.json")
+        if (!source.exists()) return
+        try {
+            val input = org.json.JSONObject(source.readText())
+            configure(input.getString("url"), input.getString("token"))
+        } finally {
+            source.delete()
+        }
+    }
+
     /** 读取草稿；没有文件时创建新草稿，损坏数据保留原文件并报告异常。 */
     fun load(): Draft =
         if (file.baseFile.exists())
@@ -92,11 +108,13 @@ class DraftStore(private val context: Context) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key())
         val encrypted = cipher.iv + cipher.doFinal(token.toByteArray())
-        prefs
-            .edit()
-            .putString("url", url.trimEnd('/') + "/")
-            .putString("token", Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .commit()
+        val saved =
+            prefs
+                .edit()
+                .putString("url", url.trimEnd('/') + "/")
+                .putString("token", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .commit()
+        check(saved) { "连接配置保存失败" }
     }
 
     /** 获取应用专属不可导出的 AES 密钥，首次使用时生成。 */

@@ -51,3 +51,18 @@ adb reverse tcp:59000 tcp:59000 # 转发签名 URL 使用的本地 S3
 验收范围见 [docs/acceptance.md](docs/acceptance.md)。REST API、ASR 事件 DTO 和路径均由 Server OpenAPI 生成，手写层仅组织业务调用、设备采集及 WebSocket 生命周期。
 
 构建局域网体验包时可传 Gradle 参数 `-PmurmurApiUrl=http://你的局域网IP:8787/`，它只设置首次使用的默认地址；设置中已保存的地址优先，API 令牌仍需自行填写，不嵌入 APK。
+
+## 一键真机开发
+
+手机开启开发者选项和 USB 调试，连接 Mac 后在手机上允许调试授权。后端先启动，然后从仓库根目录运行：
+
+```sh
+python3 Client/scripts/dev-install.py --serial 设备序列号 # 增量构建、覆盖安装、自动配置并启动
+python3 Client/scripts/dev-install.py --serial 设备序列号 --skip-build # 复用现有 APK
+```
+
+单一设备时可省略 --serial。脚本使用 install -r 保留草稿和设置，不卸载应用；从 Server/.env 读取 API_TOKEN，经 stdin 写入应用私有文件。Debug App 启动后通过 Keystore 加密保存并删除临时文件，Release 不读取该文件。令牌不进入源码、APK、命令参数或日志。
+
+默认通过 adb reverse 使用 USB 连接 API；S3 签名地址仍由后端 S3_PUBLIC_ENDPOINT 决定。当前局域网配置可以继续使用，纯 USB 模式则设为 localhost:59000 并重启后端。也可传 --url 指定可达地址。
+
+无线调试需要 Android 11+：在手机无线调试中选择配对码配对，电脑执行 adb pair 后再 adb connect；两者端口可能不同。配对后复用同一安装脚本。首次授权/配对仍需在手机确认。
