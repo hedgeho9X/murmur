@@ -24,6 +24,7 @@ data class UiState(
     val busy: Boolean = false,
     val level: Float = 0f,
     val speaking: Boolean = false,
+    val captionVisible: Boolean = false,
     val liveText: String = "",
     val page: String = "capture",
     val query: String = "",
@@ -189,6 +190,8 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
             return
         }
         speech?.cancel()
+        val visibility = RecordingVisibility()
+        silentJob?.cancel()
         val baseline = state.value.draft.text
         change {
             it.copy(
@@ -214,20 +217,27 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
                                             text
                                 )
                             )
-                            change { it.copy(liveText = text) }
+                            if (text.isNotBlank() && text != state.value.liveText)
+                                visibility.transcript(android.os.SystemClock.elapsedRealtime())
+                            change {
+                                it.copy(
+                                    liveText = text,
+                                    captionVisible =
+                                        visibility.caption(android.os.SystemClock.elapsedRealtime()),
+                                )
+                            }
                         }
                     },
                     onLevel = { level ->
                         viewModelScope.launch {
-                            change { it.copy(level = level) }
-                            if (level > .012f) {
-                                silentJob?.cancel()
-                                change { it.copy(speaking = true) }
-                                silentJob =
-                                    viewModelScope.launch {
-                                        delay(650)
-                                        change { it.copy(speaking = false) }
-                                    }
+                            val now = android.os.SystemClock.elapsedRealtime()
+                            visibility.audio(level, now)
+                            change {
+                                it.copy(
+                                    level = level,
+                                    speaking = visibility.waveform(now),
+                                    captionVisible = visibility.caption(now),
+                                )
                             }
                         }
                     },

@@ -31,4 +31,19 @@ class RecordStateTest {
         assertEquals("你好。世界", a.accept("2", "世界", false))
         assertEquals("你好。世界。", a.accept("2", "世界。", true))
     }
+
+    /** 低音量语音仍显示波形，迟到文本独立获得可读窗口，静音最终恢复留白。 */
+    @Test
+    fun visibilitySeparatesAudioAndDelayedText() {
+        val v = RecordingVisibility()
+        assertFalse(v.waveform(1000))
+        assertFalse(v.caption(1000))
+        v.audio(.004f, 1000)
+        assertTrue(v.waveform(1100))
+        assertFalse(v.waveform(1800))
+        v.transcript(1800)
+        assertTrue(v.caption(2000))
+        assertFalse(v.waveform(2000))
+        assertFalse(v.caption(3300))
+    }
 }
