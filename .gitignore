@@ -6,3 +6,9 @@ Client/api/build/
 .DS_Store
 
 Client/api/.kotlin/
+Client/.gradle/
+Client/.kotlin/
+Client/app/build/
+Client/local.properties
+*.apk
+Client/build/

@@ -75,3 +75,9 @@ npm run storage:cleanup # 手动执行一次可重试清理；API 也会每分�
 ## 源码入口
 
 HTTP 路由位于 `src/api/`；业务模块位于 `src/modules/<模块名>/`。文件采用 `模块名.职责.ts`，例如 `posts.service.ts` 与 `posts.repository.ts`。数据库连接在 `src/database/database.client.ts`；表定义按模块放在 `src/database/schemas/*.schema.ts`，由 `index.ts` 统一导出。具体分层见 [设计说明](docs/design.md#目录与职责)。
+
+## 实时语音与追加记录
+
+`POST /api/v1/posts/{id}/messages` 接收客户端生成的消息 UUIDv7 和 content，原子追加消息及附件；重复消息 ID 返回 409，不修改历史。
+
+`GET /api/v1/asr/stream` 为认证 WebSocket，具体帧协议及配置见 [ASR 说明](docs/asr.md)。`.env` 中填写 ASR_API_KEY 后重启服务。没有密钥时返回 503，普通帖子接口仍可使用。

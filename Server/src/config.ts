@@ -3,6 +3,12 @@
  */
 import { z } from "zod";
 export const Config = z.object({
+  ASR_API_KEY: z.string().optional(),
+  ASR_ENDPOINT: z
+    .string()
+    .url()
+    .default("wss://dashscope.aliyuncs.com/api-ws/v1/inference"),
+  ASR_MODEL: z.string().default("qwen-audio-3.0-asr-flash-streaming"),
   DATABASE_URL: z.string().url(),
   API_TOKEN: z.string().min(24),
   PORT: z.coerce.number().default(8787),

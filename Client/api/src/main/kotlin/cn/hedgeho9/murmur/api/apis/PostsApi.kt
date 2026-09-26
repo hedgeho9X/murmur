@@ -7,6 +7,7 @@ import okhttp3.RequestBody
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+import cn.hedgeho9.murmur.api.models.AppendMessageRequest
 import cn.hedgeho9.murmur.api.models.CreatePostRequest
 import cn.hedgeho9.murmur.api.models.CreatedPost
 import cn.hedgeho9.murmur.api.models.ErrorResponse
@@ -14,8 +15,31 @@ import cn.hedgeho9.murmur.api.models.Post
 import cn.hedgeho9.murmur.api.models.PostDetail
 import cn.hedgeho9.murmur.api.models.PostPage
 import cn.hedgeho9.murmur.api.models.RenamePostRequest
+import cn.hedgeho9.murmur.api.models.UserMessage
 
 interface PostsApi {
+    /**
+     * POST api/v1/posts/{id}/messages
+     * 
+     * 
+     * Responses:
+     *  - 201: Success
+     *  - 400: Error
+     *  - 401: Error
+     *  - 404: Error
+     *  - 409: Error
+     *  - 413: Error
+     *  - 422: Error
+     *  - 500: Error
+     *  - 503: Error
+     *
+     * @param id 
+     * @param appendMessageRequest 
+     * @return [UserMessage]
+     */
+    @POST("api/v1/posts/{id}/messages")
+    suspend fun appendMessage(@Path("id") id: java.util.UUID, @Body appendMessageRequest: AppendMessageRequest): Response<UserMessage>
+
     /**
      * POST api/v1/posts
      * 

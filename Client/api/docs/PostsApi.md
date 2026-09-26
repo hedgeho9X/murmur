@@ -4,12 +4,55 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 | ------------- | ------------- | ------------- |
+| [**appendMessage**](PostsApi.md#appendMessage) | **POST** api/v1/posts/{id}/messages |  |
 | [**createPost**](PostsApi.md#createPost) | **POST** api/v1/posts |  |
 | [**deletePost**](PostsApi.md#deletePost) | **DELETE** api/v1/posts/{id} |  |
 | [**getPost**](PostsApi.md#getPost) | **GET** api/v1/posts/{id} |  |
 | [**listPosts**](PostsApi.md#listPosts) | **GET** api/v1/posts |  |
 | [**renamePost**](PostsApi.md#renamePost) | **PATCH** api/v1/posts/{id} |  |
 
+
+
+
+
+### Example
+```kotlin
+// Import classes:
+//import cn.hedgeho9.murmur.api.*
+//import cn.hedgeho9.murmur.api.infrastructure.*
+//import cn.hedgeho9.murmur.api.models.*
+
+val apiClient = ApiClient()
+apiClient.setBearerToken("TOKEN")
+val webService = apiClient.createWebservice(PostsApi::class.java)
+val id : java.util.UUID = 38400000-8cf0-11bd-b23e-10b96e4ef00d // java.util.UUID | 
+val appendMessageRequest : AppendMessageRequest =  // AppendMessageRequest | 
+
+launch(Dispatchers.IO) {
+    val result : UserMessage = webService.appendMessage(id, appendMessageRequest)
+}
+```
+
+### Parameters
+| **id** | **java.util.UUID**|  | |
+| Name | Type | Description  | Notes |
+| ------------- | ------------- | ------------- | ------------- |
+| **appendMessageRequest** | [**AppendMessageRequest**](AppendMessageRequest.md)|  | |
+
+### Return type
+
+[**UserMessage**](UserMessage.md)
+
+### Authorization
+
+
+Configure bearerAuth:
+    ApiClient().setBearerToken("TOKEN")
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
 
 
 

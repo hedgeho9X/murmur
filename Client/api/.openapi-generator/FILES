@@ -1,5 +1,6 @@
 README.md
-build.gradle
+docs/ASRApi.md
+docs/AppendMessageRequest.md
 docs/AssistantContent.md
 docs/AssistantContentPartsInner.md
 docs/AssistantMessage.md
@@ -34,6 +35,7 @@ gradlew
 gradlew.bat
 proguard-rules.pro
 settings.gradle
+src/main/kotlin/cn/hedgeho9/murmur/api/apis/ASRApi.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/apis/ImagesApi.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/apis/PostsApi.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/auth/HttpBearerAuth.kt
@@ -53,6 +55,7 @@ src/main/kotlin/cn/hedgeho9/murmur/api/infrastructure/StringBuilderAdapter.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/infrastructure/URIAdapter.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/infrastructure/URLAdapter.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/infrastructure/UUIDAdapter.kt
+src/main/kotlin/cn/hedgeho9/murmur/api/models/AppendMessageRequest.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AssistantContent.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AssistantContentPartsInner.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AssistantMessage.kt

@@ -1,6 +1,7 @@
 /**
  * 定义并注册帖子 HTTP 接口。负责请求校验和响应序列化；业务规则交由帖子服务处理。
  */
+import { UserMessage } from "../modules/messages/messages.contracts.js";
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import * as C from "../modules/posts/posts.contracts.js";
 import type { PostsService } from "../modules/posts/posts.service.js";
@@ -99,11 +100,36 @@ const deletePostRoute = createRoute({
   },
 });
 
+/** 在已有帖子中追加不可变用户消息的 OpenAPI 契约。 */
+const appendMessageRoute = createRoute({
+  method: "post",
+  path: "/api/v1/posts/{id}/messages",
+  operationId: "appendMessage",
+  tags: ["Posts"],
+  security,
+  request: {
+    params,
+    body: {
+      required: true,
+      content: { "application/json": { schema: C.AppendMessage } },
+    },
+  },
+  responses: { 201: json(UserMessage), ...errors },
+});
 /**
  * 将帖子路由注册到传入的 Hono 应用，注入帖子服务作为处理依赖。
  * 注册本身不执行查询；收到请求后才调用服务并返回约定的 HTTP 响应。
  */
 export function registerPostsApi(app: OpenAPIHono, service: PostsService) {
+  /** POST /api/v1/posts/{id}/messages：追加用户记录并返回分配的轮次，不修改历史。 */
+  app.openapi(appendMessageRoute, async (c) =>
+    c.json(
+      UserMessage.parse(
+        await service.append(c.req.valid("param").id, c.req.valid("json")),
+      ),
+      201,
+    ),
+  );
   /**
    * POST /api/v1/posts
    * 创建帖子及首条用户消息，重复帖子 ID 返回 409。

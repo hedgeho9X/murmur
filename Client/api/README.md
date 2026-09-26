@@ -45,9 +45,11 @@ All URIs are relative to *http://localhost*
 
 | Class | Method | HTTP request | Description |
 | ------------ | ------------- | ------------- | ------------- |
+| *ASRApi* | [**streamAsr**](docs/ASRApi.md#streamasr) | **GET** api/v1/asr/stream |  |
 | *ImagesApi* | [**completeImageUpload**](docs/ImagesApi.md#completeimageupload) | **POST** api/v1/images/{id}/complete |  |
 | *ImagesApi* | [**createImageUpload**](docs/ImagesApi.md#createimageupload) | **POST** api/v1/images/uploads |  |
 | *ImagesApi* | [**getImageUrl**](docs/ImagesApi.md#getimageurl) | **GET** api/v1/images/{id}/url |  |
+| *PostsApi* | [**appendMessage**](docs/PostsApi.md#appendmessage) | **POST** api/v1/posts/{id}/messages |  |
 | *PostsApi* | [**createPost**](docs/PostsApi.md#createpost) | **POST** api/v1/posts |  |
 | *PostsApi* | [**deletePost**](docs/PostsApi.md#deletepost) | **DELETE** api/v1/posts/{id} |  |
 | *PostsApi* | [**getPost**](docs/PostsApi.md#getpost) | **GET** api/v1/posts/{id} |  |
@@ -58,6 +60,7 @@ All URIs are relative to *http://localhost*
 <a id="documentation-for-models"></a>
 ## Documentation for Models
 
+ - [cn.hedgeho9.murmur.api.models.AppendMessageRequest](docs/AppendMessageRequest.md)
  - [cn.hedgeho9.murmur.api.models.AssistantContent](docs/AssistantContent.md)
  - [cn.hedgeho9.murmur.api.models.AssistantContentPartsInner](docs/AssistantContentPartsInner.md)
  - [cn.hedgeho9.murmur.api.models.AssistantMessage](docs/AssistantMessage.md)

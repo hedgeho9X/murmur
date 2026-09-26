@@ -1,9 +1,13 @@
+/** Kotlin API 库的手写构建配置，支持独立契约测试与 Android 子模块引用。 */
 group 'cn.hedgeho9.murmur'
 version '1.0.0'
 
+if (project == rootProject) {
 wrapper {
     gradleVersion = '8.14.3'
     distributionUrl = "https://services.gradle.org/distributions/gradle-$gradleVersion-all.zip"
+}
+
 }
 
 buildscript {
@@ -68,11 +72,14 @@ dependencies {
 
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
     kotlinOptions {
+        jvmTarget = "17"
         freeCompilerArgs += "-Xopt-in=kotlinx.serialization.ExperimentalSerializationApi"
     }
 }
 
 java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
     withSourcesJar()
 }
 

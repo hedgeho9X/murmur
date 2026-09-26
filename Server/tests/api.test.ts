@@ -398,3 +398,27 @@ test("OpenAPI declares stable operations and bearer security; Scalar is served",
   assert.ok(!spec.components.schemas.UserMessage.properties.updated_at);
   assert.match(await (await app.request("/docs")).text(), /scalar/i);
 });
+
+test("append keeps original messages immutable and rejects duplicate message IDs", async () => {
+  const created = await json(
+    await request("/api/v1/posts", "POST", { content }),
+    201,
+  );
+  const id = uuidv7();
+  const path = `/api/v1/posts/${created.post.id}/messages`;
+  const appended = await json(
+    await request(path, "POST", { id, content }),
+    201,
+  );
+  assert.notEqual(appended.turn_id, created.message.turn_id);
+  await json(await request(path, "POST", { id, content }), 409);
+  const detail = await json(
+    await request(`/api/v1/posts/${created.post.id}`),
+    200,
+  );
+  assert.equal(detail.messages.length, 2);
+  assert.deepEqual(
+    detail.messages.find((m: any) => m.id === created.message.id),
+    created.message,
+  );
+});

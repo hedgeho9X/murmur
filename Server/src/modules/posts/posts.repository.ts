@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { eq, sql, desc } from "drizzle-orm";
 import type { DB, Tx } from "../../database/database.client.js";
 import { posts, messages } from "../../database/schemas/index.js";
-import type { NewPost } from "./posts.contracts.js";
+import type { NewPost, NewMessage } from "./posts.contracts.js";
 /**
  * 已解码的帖子分页边界，包含创建时间和 ID；不包含 HTTP 游标编码逻辑。
  */
@@ -46,6 +46,39 @@ export class PostsRepository {
         .returning();
       await attach(tx, message.id);
       return { post, message };
+    });
+  }
+  /** 在帖子行锁下追加用户消息和附件；帖子不存在或消息重复时返回明确结果。 */
+  async append(
+    postId: string,
+    input: NewMessage,
+    attach: (tx: Tx, messageId: string) => Promise<void>,
+  ) {
+    return this.db.transaction(async (tx) => {
+      const [post] = await tx
+        .select()
+        .from(posts)
+        .where(eq(posts.id, postId))
+        .for("update");
+      if (!post) return { kind: "missing" as const };
+      const [message] = await tx
+        .insert(messages)
+        .values({
+          id: input.id,
+          post_id: postId,
+          turn_id: randomUUID(),
+          role: "user",
+          content: input.content,
+        })
+        .onConflictDoNothing({ target: messages.id })
+        .returning();
+      if (!message) return { kind: "duplicate" as const };
+      await attach(tx, message.id);
+      await tx
+        .update(posts)
+        .set({ updated_at: new Date() })
+        .where(eq(posts.id, postId));
+      return { kind: "created" as const, message };
     });
   }
   /**

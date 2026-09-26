@@ -1,2 +1,5 @@
 # 手写契约测试位于 contract/，不生成占位测试。
 src/test/kotlin/cn/hedgeho9/murmur/api/**
+
+# Gradle 配置由仓库维护，以支持 Android 多模块构建。
+build.gradle

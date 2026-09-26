@@ -4,7 +4,7 @@
  */
 import { ApiError } from "../../common/errors.js";
 import { wire } from "../../common/serialization.js";
-import type { NewPost } from "./posts.contracts.js";
+import type { NewPost, NewMessage } from "./posts.contracts.js";
 import type { PostsRepository, PostCursor } from "./posts.repository.js";
 import type { ImagesRepository } from "../images/images.repository.js";
 /**
@@ -54,6 +54,30 @@ export class PostsService {
     return wire(result);
   }
 
+  /** 向已有帖子追加记录，保留原历史；图片绑定失败时整体回滚。 */
+  async append(postId: string, input: NewMessage) {
+    if (!input.content.parts.some((p) => p.type === "image" || p.text.trim()))
+      throw new ApiError(422, "EMPTY_CONTENT", "Text or image required");
+    const ids = input.content.parts.flatMap((p) =>
+      p.type === "image" ? [p.image_id] : [],
+    );
+    if (new Set(ids).size !== ids.length)
+      throw new ApiError(422, "DUPLICATE_IMAGE", "Duplicate image");
+    const result = await this.posts.append(postId, input, async (tx, id) => {
+      for (const image of [...ids].sort())
+        if (!(await this.images.attach(tx, image, id)))
+          throw new ApiError(409, "IMAGE_UNAVAILABLE", "Image unavailable");
+    });
+    if (result.kind === "missing")
+      throw new ApiError(404, "POST_NOT_FOUND", "Post not found");
+    if (result.kind === "duplicate")
+      throw new ApiError(
+        409,
+        "MESSAGE_ALREADY_EXISTS",
+        "Message ID already exists",
+      );
+    return wire(result.message);
+  }
   /**
    * 按 ID 返回帖子和消息的 JSON 快照；不存在时抛出可公开的 404 异常。
    */
