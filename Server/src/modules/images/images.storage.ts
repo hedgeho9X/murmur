@@ -1,4 +1,7 @@
-/** S3 transport separates private server access from client-reachable signed URLs. */
+/**
+ * 通过 S3 协议访问图片对象，区分服务端访问地址和客户端可达的签名地址。
+ * 负责字节校验及对象传输，不维护图片数据库状态或业务归属。
+ */
 import {
   S3Client,
   PutObjectCommand,
@@ -10,12 +13,17 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import sharp from "sharp";
 import { config } from "../../config.js";
 import { ApiError } from "../../common/errors.js";
-/** Owns S3 clients and verifies temporary uploads before publishing immutable image objects. */
+/**
+ * 管理 S3 客户端，在发布图片前验证临时上传的实际内容。
+ */
 export class Storage {
   readonly client: S3Client;
   private publicClient: S3Client;
   readonly bucket: string;
-  /** Creates clients with the same credentials but different reachable endpoints. */
+  /**
+   * 根据运行配置创建内部与公开地址的 S3 客户端，二者共享凭据和 bucket。
+   * 构造过程不向 S3 发送请求。
+   */
   constructor(c: ReturnType<typeof config>) {
     const options = {
       region: c.S3_REGION,
@@ -33,7 +41,10 @@ export class Storage {
     });
     this.bucket = c.S3_BUCKET;
   }
-  /** Returns a short-lived PUT URL for a staging key, never the published object. */
+  /**
+   * 根据临时对象键、声明类型和大小生成 15 分钟 PUT 地址。
+   * 只签名不上传；调用方必须传入临时键，不能开放最终图片键的覆盖权限。
+   */
   uploadUrl(key: string, type: string, size: number) {
     return getSignedUrl(
       this.publicClient,
@@ -46,7 +57,10 @@ export class Storage {
       { expiresIn: 900 },
     );
   }
-  /** Returns a short-lived read URL after the API has checked resource ownership. */
+  /**
+   * 根据最终对象键生成 5 分钟 GET 地址，不读取对象。
+   * 调用方必须先验证该图片存在、已就绪且允许访问。
+   */
   readUrl(key: string) {
     return getSignedUrl(
       this.publicClient,
@@ -54,7 +68,11 @@ export class Storage {
       { expiresIn: 300 },
     );
   }
-  /** Validates a bounded image and writes the exact validated bytes to its final key. */
+  /**
+   * 读取临时对象，核对大小并实际解码单帧图片，将验证后的相同字节写入最终键。
+   * 成功返回宽高；缺失、损坏、类型不符或超出限制时拒绝发布。
+   * S3 写入不参与数据库事务，调用方需通过重试或对象清理处理跨系统失败。
+   */
   async finalize(staging: string, target: string, type: string, size: number) {
     try {
       const head = await this.client.send(
@@ -138,7 +156,10 @@ export class Storage {
       throw e;
     }
   }
-  /** S3 deletion is idempotent, allowing the durable cleanup queue to retry safely. */
+  /**
+   * 按对象键请求 S3 删除，对象已不存在时仍可安全重试。
+   * 请求失败时向调用方抛错，由清理队列保留任务。
+   */
   async remove(key: string) {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),

@@ -1,4 +1,7 @@
-/** Composition root for module services sharing one transaction-capable database pool. */
+/**
+ * 装配业务模块及其存储依赖，确保各仓储复用同一数据库连接池。
+ * 不注册 HTTP 路由，不在装配阶段执行查询。
+ */
 import type { DB } from "../database/database.client.js";
 import type { Storage } from "./images/images.storage.js";
 import { PostsRepository } from "./posts/posts.repository.js";
@@ -6,9 +9,14 @@ import { PostsService } from "./posts/posts.service.js";
 import { ImagesRepository } from "./images/images.repository.js";
 import { ImagesService } from "./images/images.service.js";
 import { IdempotencyRepository } from "./idempotency/idempotency.repository.js";
-/** Public application capabilities supplied to route registration. */
+/**
+ * 供 HTTP 层调用的模块服务集合，不暴露数据库连接和仓储对象。
+ */
 export type Services = { posts: PostsService; images: ImagesService };
-/** Constructs concrete repositories/services without executing queries. */
+/**
+ * 接收数据库客户端与 S3 适配器，构造帖子、图片服务及共享的幂等仓储。
+ * 返回服务集合；此过程不发送查询或存储请求。
+ */
 export function createServices(db: DB, storage: Storage): Services {
   const idempotency = new IdempotencyRepository(db);
   const images = new ImagesRepository(db);

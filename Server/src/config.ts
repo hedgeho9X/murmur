@@ -1,4 +1,6 @@
-/** Runtime configuration; secrets are read only by the server and local scripts. */
+/**
+ * 读取并校验后端运行配置。密钥仅供服务和本地脚本使用，不向 API 响应输出。
+ */
 import { z } from "zod";
 export const Config = z.object({
   DATABASE_URL: z.string().url(),
@@ -12,7 +14,10 @@ export const Config = z.object({
   S3_BUCKET: z.string().min(1),
   S3_REGION: z.string().default("us-east-1"),
 });
-/** Loads required settings without printing secret values on validation failure. */
+/**
+ * 从进程环境读取配置并补齐默认值，返回通过校验的配置对象。
+ * 缺失或无效时抛错，错误中只包含配置项名称，不包含密钥值。
+ */
 export function config() {
   const result = Config.safeParse(process.env);
   if (!result.success)

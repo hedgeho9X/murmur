@@ -1,16 +1,28 @@
-/** PostgreSQL operations for posts and their first immutable message. */
+/**
+ * 封装帖子及首条用户消息的 PostgreSQL 读写。
+ * 只处理查询、事务快照和关系删除；内容校验与分页编码由服务负责。
+ */
 import { randomUUID } from "node:crypto";
 import { eq, sql, desc } from "drizzle-orm";
 import type { DB, Tx } from "../../database/database.client.js";
 import { posts, messages } from "../../database/database.schema.js";
 import type { NewPost } from "./posts.contracts.js";
-/** A decoded list cursor, independent of its HTTP representation. */
+/**
+ * 已解码的帖子分页边界，包含创建时间和 ID；不包含 HTTP 游标编码逻辑。
+ */
 export type PostCursor = { t: string; id: string };
-/** Owns post SQL; business validation and response shaping belong to the service. */
+/**
+ * 执行帖子相关 SQL，创建操作使用上层传入的事务以保证跨模块原子性。
+ */
 export class PostsRepository {
-  /** Uses the shared pool for reads and the supplied transaction for atomic creation. */
+  /**
+   * 注入共享数据库客户端，用于读取、元数据更新和删除；构造时不执行查询。
+   */
   constructor(private readonly db: DB) {}
-  /** Inserts a post and user message into an existing idempotent transaction. */
+  /**
+   * 在传入事务中插入帖子及第一条用户消息，分配消息 ID 与轮次 ID，返回插入结果。
+   * 不自行提交事务，图片绑定和幂等回执由调用方在同一事务中完成。
+   */
   async create(tx: Tx, input: NewPost) {
     const [post] = await tx
       .insert(posts)
@@ -28,7 +40,10 @@ export class PostsRepository {
       .returning();
     return { post, message };
   }
-  /** Reads post and messages from one consistent snapshot; returns undefined when absent. */
+  /**
+   * 按帖子 ID 在同一只读快照中读取帖子及按时间、ID 排列的消息。
+   * 帖子不存在时返回 undefined，不修改任何数据。
+   */
   async detail(id: string) {
     return this.db.transaction(
       async (tx) => {
@@ -44,7 +59,10 @@ export class PostsRepository {
       { isolationLevel: "repeatable read", accessMode: "read only" },
     );
   }
-  /** Fetches one extra row to determine whether another cursor page exists. */
+  /**
+   * 根据页大小和可选边界读取倒序帖子，多取一条以判断是否还有下一页。
+   * 返回数据库行，不生成游标或修改数据。
+   */
   list(limit: number, cursor?: PostCursor) {
     const boundary = cursor
       ? sql`(${posts.created_at}, ${posts.id}) < (${cursor.t}::timestamptz, ${cursor.id}::uuid)`
@@ -56,7 +74,10 @@ export class PostsRepository {
       .orderBy(desc(posts.created_at), desc(posts.id))
       .limit(limit + 1);
   }
-  /** Updates only post metadata, never sent messages. */
+  /**
+   * 按帖子 ID 更新标题和修改时间，返回更新后的帖子；不存在时返回 undefined。
+   * 不修改该帖子的任何已发送消息。
+   */
   async rename(id: string, title: string | null) {
     const [post] = await this.db
       .update(posts)
@@ -65,7 +86,10 @@ export class PostsRepository {
       .returning();
     return post;
   }
-  /** Cascades deletion; database triggers enqueue object cleanup and redact receipts. */
+  /**
+   * 按 ID 删除帖子，依赖外键级联删除消息和图片元数据。
+   * 数据库触发器同时记录对象清理任务、清除回执正文；不存在时无操作。
+   */
   async delete(id: string) {
     await this.db.delete(posts).where(eq(posts.id, id));
   }

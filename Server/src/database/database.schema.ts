@@ -1,4 +1,7 @@
-/** Relational ownership and immutable messages; image bytes live in S3. */
+/**
+ * 定义帖子、不可变消息、图片归属、幂等回执和对象清理表。
+ * 这里只声明表与关联；消息不可更新等触发器约束由已提交的 SQL 迁移实施。
+ */
 import {
   pgTable,
   uuid,
@@ -9,10 +12,12 @@ import {
   primaryKey,
   index,
 } from "drizzle-orm/pg-core";
+/** 创建使用数据库默认时间的毫秒精度时间列，与接口时间序列化精度保持一致。 */
 const created = () =>
   timestamp("created_at", { withTimezone: true, precision: 3 })
     .notNull()
     .defaultNow();
+/** 帖子容器与可修改标题；消息内容由 messages 表维护。 */
 export const posts = pgTable("posts", {
   id: uuid().primaryKey(),
   title: text(),
@@ -21,6 +26,7 @@ export const posts = pgTable("posts", {
     .notNull()
     .defaultNow(),
 });
+/** 只追加的消息记录；帖子删除时级联清理，更新限制由数据库触发器实施。 */
 export const messages = pgTable(
   "messages",
   {
@@ -39,6 +45,7 @@ export const messages = pgTable(
     index("messages_turn").on(t.turn_id),
   ],
 );
+/** 图片对象元数据及单一消息归属；实际文件存储在 S3。 */
 export const images = pgTable("images", {
   id: uuid().primaryKey(),
   object_key: text().notNull().unique(),
@@ -51,6 +58,7 @@ export const images = pgTable("images", {
   message_id: uuid().references(() => messages.id, { onDelete: "cascade" }),
   created_at: created(),
 });
+/** 按操作范围和请求键保存请求哈希及响应快照，防止重复创建。 */
 export const idempotency = pgTable(
   "idempotency",
   {
@@ -62,6 +70,7 @@ export const idempotency = pgTable(
   },
   (t) => [primaryKey({ columns: [t.scope, t.key] })],
 );
+/** 待删除对象的持久队列，存储失败时保留对象键和重试次数。 */
 export const objectCleanup = pgTable("object_cleanup", {
   object_key: text().primaryKey(),
   created_at: created(),

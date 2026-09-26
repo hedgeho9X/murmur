@@ -1,4 +1,7 @@
-/** Creates the private development bucket and expires staging objects after one day. */
+/**
+ * 初始化配置指定的私有 bucket，并设置临时对象的一天过期策略。
+ * 会修改对象存储配置，不创建帖子或消息。
+ */
 import {
   CreateBucketCommand,
   HeadBucketCommand,

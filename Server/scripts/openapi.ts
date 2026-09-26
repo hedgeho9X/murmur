@@ -1,4 +1,7 @@
-/** Exports the contract offline; the app factory never invokes these runtime dependencies. */
+/**
+ * 从已注册的 HTTP 契约导出 OpenAPI 文件。
+ * 仅写入 openapi/openapi.json，不读取密钥、不连接数据库或执行业务服务。
+ */
 import { writeFileSync } from "node:fs";
 import { createApp } from "../src/api/app.api.js";
 import type { Services } from "../src/modules/modules.js";

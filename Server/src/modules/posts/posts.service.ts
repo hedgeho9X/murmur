@@ -1,19 +1,29 @@
-/** Post policies and orchestration, with all SQL delegated to repositories. */
+/**
+ * 校验帖子业务输入，协调幂等创建、图片绑定与列表响应。
+ * 所有数据库访问交由仓储，消息正文在创建后不允许修改。
+ */
 import { ApiError } from "../../common/errors.js";
 import { wire } from "../../common/serialization.js";
 import type { NewPost } from "./posts.contracts.js";
 import type { PostsRepository, PostCursor } from "./posts.repository.js";
 import type { ImagesRepository } from "../images/images.repository.js";
 import type { IdempotencyRepository } from "../idempotency/idempotency.repository.js";
-/** Coordinates post creation, attachment ownership and cursor serialization. */
+/**
+ * 提供帖子创建、读取、改名和删除能力，协调跨模块仓储而不直接编写 SQL。
+ */
 export class PostsService {
-  /** Injects repositories that share a database and transaction contract. */
+  /**
+   * 注入帖子、图片和幂等仓储，要求它们使用同一数据库以共享创建事务。
+   */
   constructor(
     private readonly posts: PostsRepository,
     private readonly images: ImagesRepository,
     private readonly idempotency: IdempotencyRepository,
   ) {}
-  /** Validates content and commits post, message, attachments and receipt together. */
+  /**
+   * 校验正文与附件，按幂等键原子创建帖子、首条消息、图片归属和响应回执。
+   * 返回创建快照；空内容、重复图片或不可用图片会拒绝请求，不留下部分写入。
+   */
   async create(input: NewPost, key: string) {
     if (
       !input.content.parts.some(
@@ -36,7 +46,7 @@ export class PostsService {
       { ...input, title: input.title ?? null },
       async (tx) => {
         const result = await this.posts.create(tx, input);
-        // A stable lock order avoids deadlocks for overlapping concurrent attachments.
+        // 按固定顺序获取图片行锁，避免并发帖子绑定重叠图片时发生死锁。
         for (const id of [...ids].sort()) {
           if (!(await this.images.attach(tx, id, result.message.id)))
             throw new ApiError(
@@ -49,13 +59,18 @@ export class PostsService {
       },
     );
   }
-  /** Returns a complete post view or an explicit not-found error. */
+  /**
+   * 按 ID 返回帖子和消息的 JSON 快照；不存在时抛出可公开的 404 异常。
+   */
   async detail(id: string) {
     const result = await this.posts.detail(id);
     if (!result) throw new ApiError(404, "POST_NOT_FOUND", "Post not found");
     return wire(result);
   }
-  /** Validates opaque cursors and builds the next page token. */
+  /**
+   * 校验并解码游标，读取一页帖子并生成下一页游标，返回 JSON 响应数据。
+   * 非法游标返回 400；本操作不修改帖子。
+   */
   async list(limit: number, cursor?: string) {
     let boundary: PostCursor | undefined;
     if (cursor) {
@@ -89,13 +104,17 @@ export class PostsService {
           : null,
     });
   }
-  /** Applies the post-title update policy while leaving message history untouched. */
+  /**
+   * 按 ID 修改帖子标题并返回 JSON 快照；不存在时返回 404，消息历史保持不变。
+   */
   async rename(id: string, title: string | null) {
     const post = await this.posts.rename(id, title);
     if (!post) throw new ApiError(404, "POST_NOT_FOUND", "Post not found");
     return wire(post);
   }
-  /** Repeated deletion is safe and does not recreate any data. */
+  /**
+   * 删除指定帖子及所属数据，重复调用不会重新创建数据；对象删除通过持久队列完成。
+   */
   delete(id: string) {
     return this.posts.delete(id);
   }

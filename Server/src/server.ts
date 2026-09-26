@@ -1,4 +1,7 @@
-/** Starts the local Hono server and closes database connections on shutdown. */
+/**
+ * 启动 Hono 服务并定期执行对象清理；收到退出信号时停止监听并关闭连接池。
+ * 模块装配与 HTTP 契约分别交由 modules 和 api 目录维护。
+ */
 import { serve } from "@hono/node-server";
 import { cleanup } from "./modules/images/images.cleanup.js";
 import { config } from "./config.js";

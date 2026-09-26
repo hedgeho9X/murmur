@@ -1,15 +1,27 @@
-/** Image ownership, upload state and durable object-cleanup SQL. */
+/**
+ * 封装图片元数据、消息归属、上传完成状态与清理队列的 PostgreSQL 操作。
+ * 不访问 S3；需要验证图片时通过回调交回服务层。
+ */
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import type { DB, Tx } from "../../database/database.client.js";
 import { images, objectCleanup } from "../../database/database.schema.js";
-/** A persisted image row passed to byte verification under a transaction lock. */
+/**
+ * 图片持久化记录，包含服务端对象键和归属信息；不直接作为公开响应。
+ */
 export type ImageRow = typeof images.$inferSelect;
-/** Owns image SQL and the lock protecting upload completion and post attachment. */
+/**
+ * 管理图片 SQL 与行锁，协调上传完成、附件认领和可重试对象清理。
+ */
 export class ImagesRepository {
-  /** Uses the shared pool; cross-module writes accept an existing transaction. */
+  /**
+   * 注入共享数据库客户端；跨模块写入使用调用方传入的事务。
+   */
   constructor(private readonly db: DB) {}
-  /** Allocates private staging/final keys as part of an idempotent upload request. */
+  /**
+   * 在传入事务内分配图片 ID、临时键和最终键，写入待上传记录并返回。
+   * 不创建 S3 对象，不自行提交事务。
+   */
   async create(tx: Tx, input: { content_type: string; size_bytes: number }) {
     const id = randomUUID();
     const [image] = await tx
@@ -23,7 +35,10 @@ export class ImagesRepository {
       .returning();
     return image;
   }
-  /** Atomically binds only a ready, unclaimed image to an immutable message. */
+  /**
+   * 在传入事务内将已完成且未被认领的图片绑定到消息，返回是否绑定成功。
+   * 条件更新保证并发请求最多有一个能认领同一图片。
+   */
   async attach(tx: Tx, id: string, messageId: string) {
     const rows = await tx
       .update(images)
@@ -38,7 +53,9 @@ export class ImagesRepository {
       .returning();
     return rows.length > 0;
   }
-  /** Finds metadata without exposing storage internals through the public contract. */
+  /**
+   * 按图片 ID 查询元数据，不存在时返回 undefined；不生成签名地址或修改数据。
+   */
   async find(id: string) {
     const [image] = await this.db
       .select()
@@ -46,7 +63,11 @@ export class ImagesRepository {
       .where(eq(images.id, id));
     return image;
   }
-  /** Holds the row lock while the service verifies bytes, then publishes ready metadata. */
+  /**
+   * 锁定图片行，调用 verify 验证字节，保存宽高与 ready 状态并登记临时对象清理。
+   * 已完成时直接返回记录，不存在时返回 undefined；回调失败则回滚数据库事务。
+   * 回调访问 S3 时行锁仍被持有，调用方需控制上传大小和外部操作耗时。
+   */
   async complete(
     id: string,
     verify: (image: ImageRow) => Promise<{ width: number; height: number }>,
@@ -71,13 +92,17 @@ export class ImagesRepository {
       return ready;
     });
   }
-  /** Removes abandoned metadata, letting the deletion trigger queue its objects. */
+  /**
+   * 删除指定时间之前未关联消息的图片元数据，由删除触发器登记对象清理任务。
+   */
   async expireUnattached(before: Date) {
     await this.db
       .delete(images)
       .where(and(isNull(images.message_id), lt(images.created_at, before)));
   }
-  /** Reads a bounded, oldest-first cleanup batch. */
+  /**
+   * 按创建时间读取最多 100 个清理任务；只读取，不认领或删除任务。
+   */
   pendingCleanup() {
     return this.db
       .select()
@@ -85,13 +110,17 @@ export class ImagesRepository {
       .orderBy(objectCleanup.created_at)
       .limit(100);
   }
-  /** Removes a queue item only after its object was successfully deleted. */
+  /**
+   * 按对象键删除已完成的清理项；必须在 S3 删除成功后调用，重复确认无副作用。
+   */
   async acknowledgeCleanup(key: string) {
     await this.db
       .delete(objectCleanup)
       .where(eq(objectCleanup.object_key, key));
   }
-  /** Keeps failed items queued and increments their diagnostic attempt count. */
+  /**
+   * 增加指定清理项的失败次数并保留记录，以便后续清理继续重试。
+   */
   async failCleanup(key: string) {
     await this.db
       .update(objectCleanup)

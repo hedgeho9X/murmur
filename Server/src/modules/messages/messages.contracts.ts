@@ -1,4 +1,7 @@
-/** Immutable message payloads and ordered content parts. */
+/**
+ * 定义不可变消息、角色约束和有序内容块契约，供 API 序列化与客户端生成使用。
+ * 不负责消息持久化或 Agent 执行。
+ */
 import { z } from "@hono/zod-openapi";
 import { Id } from "../../common/contracts.js";
 export const TextPart = z

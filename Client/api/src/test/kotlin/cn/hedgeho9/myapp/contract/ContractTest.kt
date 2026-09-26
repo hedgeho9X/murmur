@@ -1,4 +1,4 @@
-/** Verifies generated polymorphic JSON and the actual Hono HTTP contract. */
+/** 验证生成客户端的多态 JSON 编解码和真实 Hono HTTP 契约，不修改生成代码。 */
 package cn.hedgeho9.myapp.contract
 
 import cn.hedgeho9.myapp.api.apis.PostsApi
@@ -12,7 +12,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import java.util.UUID
 
-/** Runs against the local development server, cleaning up only its newly created post. */
+/** 连接本地开发服务验证调用链，仅创建并清理本测试产生的帖子。 */
 class ContractTest : ShouldSpec() {
     init {
         should("round-trip text, tool calls, arbitrary JSON and image references") {

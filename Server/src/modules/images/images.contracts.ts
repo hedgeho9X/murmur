@@ -1,4 +1,6 @@
-/** Image upload and metadata contracts; object keys remain server-owned. */
+/**
+ * 定义图片上传请求和公开元数据契约；服务端对象键不属于公开响应。
+ */
 import { z } from "@hono/zod-openapi";
 import { Id } from "../../common/contracts.js";
 export const Image = z

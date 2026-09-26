@@ -1,4 +1,7 @@
-/** Post request and response schemas used by the HTTP boundary. */
+/**
+ * 定义帖子创建、详情和列表复用的数据契约，供 API 校验与客户端生成使用。
+ * 不承载数据库操作或业务流程。
+ */
 import { z } from "@hono/zod-openapi";
 import { Id } from "../../common/contracts.js";
 import {
@@ -27,4 +30,5 @@ export const CreatedPost = z
 export const PostDetail = z
   .object({ post: Post, messages: z.array(Message) })
   .openapi("PostDetail");
+/** 通过创建契约校验的帖子输入；ID、角色、时间和轮次由服务端生成。 */
 export type NewPost = z.infer<typeof CreatePost>;

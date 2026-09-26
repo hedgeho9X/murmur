@@ -1,4 +1,7 @@
-/** Integration acceptance against isolated PostgreSQL database and real local S3. */
+/**
+ * 使用独立临时 PostgreSQL 数据库与真实本地 S3 验证 API 行为。
+ * 测试仅创建和清理自己的数据，不复用日常帖子；运行账号需要创建数据库权限。
+ */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -27,7 +30,10 @@ url.pathname = "/" + schema;
 const { db, pool } = connect(url.toString());
 const storage = new Storage(c);
 const app = createApp(createServices(db, storage), c.API_TOKEN);
-/** Sends a validated-style HTTP request through the actual Hono router. */
+/**
+ * 构造带认证和幂等键的请求并交给实际 Hono 路由，返回 HTTP 响应。
+ * 有请求体时进行 JSON 编码；测试产生的业务写入由测试生命周期清理。
+ */
 function request(
   path: string,
   method = "GET",
@@ -44,7 +50,10 @@ function request(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
-/** Reads an expected response while showing safe error bodies on assertion failure. */
+/**
+ * 解析响应 JSON 并断言状态码，返回解析结果供后续断言使用。
+ * 失败时显示业务响应，不读取或输出环境密钥。
+ */
 async function json(response: Response, status: number) {
   const body = await response.json();
   assert.equal(response.status, status, JSON.stringify(body));
@@ -234,7 +243,10 @@ test("rename changes only post, pagination has no duplicates, delete is idempote
   await json(await request("/api/v1/posts/" + created.post.id), 404);
   await json(await request("/api/v1/posts", "POST", { content }, key), 410);
 });
-/** Uploads a real byte buffer using the API-issued signed PUT URL. */
+/**
+ * 通过 API 申请上传地址并 PUT 指定图片字节，返回上传申请结果。
+ * 会创建测试图片记录和临时 S3 对象，后续由测试清理。
+ */
 async function upload(bytes: Buffer, type = "image/png") {
   const result = await json(
     await request("/api/v1/images/uploads", "POST", {
@@ -272,7 +284,7 @@ test("real S3 upload, content verification, immutable final image and cascade cl
     Buffer.from(await (await fetch(read.url)).arrayBuffer()),
     bytes,
   );
-  // Reusing a still-valid upload URL can only overwrite staging, not the published image.
+  // 旧签名仍可能有效，重复上传只能影响临时对象，不能改变已发布的图片。
   assert.equal(
     (
       await fetch(u.upload_url, {

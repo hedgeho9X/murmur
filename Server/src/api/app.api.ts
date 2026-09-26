@@ -1,4 +1,7 @@
-/** Composes HTTP middleware, module routes and API documentation. */
+/**
+ * 装配鉴权、请求体限制、统一错误处理、业务路由和 Scalar 文档。
+ * 只负责 HTTP 应用组合，不创建数据库连接或执行后台任务。
+ */
 import { timingSafeEqual } from "node:crypto";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
@@ -7,7 +10,10 @@ import { ApiError } from "../common/errors.js";
 import type { Services } from "../modules/modules.js";
 import { registerPostsApi } from "./posts.api.js";
 import { registerImagesApi } from "./images.api.js";
-/** Registers routes offline as well as with live injected services. */
+/**
+ * 根据模块服务和访问令牌创建 Hono 应用，返回可处理请求及导出 OpenAPI 的实例。
+ * 注册阶段不调用服务；离线导出文档时允许注入不执行的服务占位对象。
+ */
 export function createApp(services: Services, token: string) {
   const app = new OpenAPIHono({
     defaultHook: (result, c) => {
