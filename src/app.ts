@@ -351,13 +351,13 @@ export function createApp(
   app.get("/health", (c) => c.json({ status: "ok" }));
   app.doc("/openapi.json", {
     openapi: "3.0.3",
-    info: { title: "MyAPP API", version: "0.1.0" },
+    info: { title: "Murmur API", version: "0.1.0" },
   });
   app.get(
     "/docs",
     Scalar({
       url: "/openapi.json",
-      pageTitle: "MyAPP API",
+      pageTitle: "Murmur API",
       persistAuth: false,
     }),
   );

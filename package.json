@@ -1,5 +1,5 @@
 {
-  "name": "myapp-api",
+  "name": "murmur-api",
   "private": true,
   "type": "module",
   "scripts": {

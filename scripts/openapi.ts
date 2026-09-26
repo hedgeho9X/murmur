@@ -13,7 +13,7 @@ writeFileSync(
   JSON.stringify(
     app.getOpenAPIDocument({
       openapi: "3.0.3",
-      info: { title: "MyAPP API", version: "0.1.0" },
+      info: { title: "Murmur API", version: "0.1.0" },
     }),
     null,
     2,
