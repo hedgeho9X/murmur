@@ -7,7 +7,7 @@ export class ApiError extends Error {
    * 创建包含 HTTP 状态码、稳定业务码和公开提示的异常，不执行日志或网络操作。
    */
   constructor(
-    public status: 400 | 404 | 409 | 422,
+    public status: 400 | 404 | 409 | 422 | 503,
     public code: string,
     message: string,
   ) {

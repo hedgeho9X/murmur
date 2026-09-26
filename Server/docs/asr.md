@@ -20,3 +20,9 @@
 OpenAPI 只描述升级入口，双向事件协议以上述说明为准。生成的 Retrofit ASRApi 不是 WebSocket 客户端；Android 使用独立的 SpeechRecorder 实现连接。
 
 客户端的 JSON 事件类型由 `asr.contracts.ts → OpenAPI → Kotlin` 生成；`api-paths.ts` 从同一份 OpenAPI 生成 ApiPaths。WebSocket 的握手、二进制发送和生命周期仍由传输层实现，不能用普通 Retrofit GET 替代升级连接。
+
+## 手机短期凭据
+
+`POST /api/v1/asr/credentials` 使用业务 Bearer token 鉴权，向当前 ASR endpoint 对应的百炼业务空间申请 900 秒临时凭据，返回 endpoint/model/token/expires_at 并设置 `Cache-Control: no-store`。永久 API key 仅用于服务器到供应商的请求。上游拒绝或返回无效凭据时返回 503，公开响应不携带原始上游错误。
+
+直连音频不经过本服务，转发会话的并发计数无法覆盖直连会话；单次录音时长由客户端限制。临时凭据属于供应商授权范围，不能理解为只允许调用一个 ASR 任务的单次票据。

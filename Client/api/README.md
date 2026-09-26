@@ -45,6 +45,7 @@ All URIs are relative to *http://localhost*
 
 | Class | Method | HTTP request | Description |
 | ------------ | ------------- | ------------- | ------------- |
+| *ASRApi* | [**createAsrCredentials**](docs/ASRApi.md#createasrcredentials) | **POST** api/v1/asr/credentials |  |
 | *ASRApi* | [**streamAsr**](docs/ASRApi.md#streamasr) | **GET** api/v1/asr/stream |  |
 | *ImagesApi* | [**completeImageUpload**](docs/ImagesApi.md#completeimageupload) | **POST** api/v1/images/{id}/complete |  |
 | *ImagesApi* | [**createImageUpload**](docs/ImagesApi.md#createimageupload) | **POST** api/v1/images/uploads |  |
@@ -66,6 +67,7 @@ All URIs are relative to *http://localhost*
  - [cn.hedgeho9.murmur.api.models.AsrCancel](docs/AsrCancel.md)
  - [cn.hedgeho9.murmur.api.models.AsrClientEvent](docs/AsrClientEvent.md)
  - [cn.hedgeho9.murmur.api.models.AsrCompleted](docs/AsrCompleted.md)
+ - [cn.hedgeho9.murmur.api.models.AsrCredentials](docs/AsrCredentials.md)
  - [cn.hedgeho9.murmur.api.models.AsrError](docs/AsrError.md)
  - [cn.hedgeho9.murmur.api.models.AsrFinish](docs/AsrFinish.md)
  - [cn.hedgeho9.murmur.api.models.AsrReady](docs/AsrReady.md)

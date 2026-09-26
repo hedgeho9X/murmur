@@ -7,8 +7,30 @@ import okhttp3.RequestBody
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+import cn.hedgeho9.murmur.api.models.AsrCredentials
+import cn.hedgeho9.murmur.api.models.ErrorResponse
 
 interface ASRApi {
+    /**
+     * POST api/v1/asr/credentials
+     * 
+     * 
+     * Responses:
+     *  - 200: Success
+     *  - 400: Error
+     *  - 401: Error
+     *  - 404: Error
+     *  - 409: Error
+     *  - 413: Error
+     *  - 422: Error
+     *  - 500: Error
+     *  - 503: Error
+     *
+     * @return [AsrCredentials]
+     */
+    @POST("api/v1/asr/credentials")
+    suspend fun createAsrCredentials(): Response<AsrCredentials>
+
     /**
      * GET api/v1/asr/stream
      * 

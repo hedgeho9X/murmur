@@ -4,6 +4,7 @@ docs/AppendMessageRequest.md
 docs/AsrCancel.md
 docs/AsrClientEvent.md
 docs/AsrCompleted.md
+docs/AsrCredentials.md
 docs/AsrError.md
 docs/AsrFinish.md
 docs/AsrReady.md
@@ -71,6 +72,7 @@ src/main/kotlin/cn/hedgeho9/murmur/api/models/AppendMessageRequest.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AsrCancel.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AsrClientEvent.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AsrCompleted.kt
+src/main/kotlin/cn/hedgeho9/murmur/api/models/AsrCredentials.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AsrError.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AsrFinish.kt
 src/main/kotlin/cn/hedgeho9/murmur/api/models/AsrReady.kt

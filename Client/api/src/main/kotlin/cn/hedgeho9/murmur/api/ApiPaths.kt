@@ -2,6 +2,7 @@
 package cn.hedgeho9.murmur.api
 
 object ApiPaths {
+    const val CREATE_ASR_CREDENTIALS = "/api/v1/asr/credentials"
     const val STREAM_ASR = "/api/v1/asr/stream"
     const val EDIT_MESSAGE = "/api/v1/posts/{id}/messages/{messageId}"
     const val SUGGEST_TAGS = "/api/v1/tags"

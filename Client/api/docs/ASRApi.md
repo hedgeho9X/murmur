@@ -4,8 +4,46 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 | ------------- | ------------- | ------------- |
+| [**createAsrCredentials**](ASRApi.md#createAsrCredentials) | **POST** api/v1/asr/credentials |  |
 | [**streamAsr**](ASRApi.md#streamAsr) | **GET** api/v1/asr/stream |  |
 
+
+
+
+
+### Example
+```kotlin
+// Import classes:
+//import cn.hedgeho9.murmur.api.*
+//import cn.hedgeho9.murmur.api.infrastructure.*
+//import cn.hedgeho9.murmur.api.models.*
+
+val apiClient = ApiClient()
+apiClient.setBearerToken("TOKEN")
+val webService = apiClient.createWebservice(ASRApi::class.java)
+
+launch(Dispatchers.IO) {
+    val result : AsrCredentials = webService.createAsrCredentials()
+}
+```
+
+### Parameters
+This endpoint does not need any parameter.
+
+### Return type
+
+[**AsrCredentials**](AsrCredentials.md)
+
+### Authorization
+
+
+Configure bearerAuth:
+    ApiClient().setBearerToken("TOKEN")
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
 
 
 

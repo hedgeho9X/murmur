@@ -42,3 +42,13 @@ export const AsrServerEvent = z
   .openapi("AsrServerEvent");
 /** 服务端可发送的事件类型，与生成客户端的判别联合对应。 */
 export type ServerEvent = z.infer<typeof AsrServerEvent>;
+
+/** 直连所需的短期凭据，不包含服务端永久 Key。 */
+export const AsrCredentials = z
+  .object({
+    endpoint: z.string(),
+    model: z.string(),
+    token: z.string(),
+    expires_at: z.number().int().positive(),
+  })
+  .openapi("AsrCredentials");
