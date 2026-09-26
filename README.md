@@ -1,13 +1,45 @@
 # Murmur
 
-Kotlin / Android 个人记录与思考助手，连接用户自己的 Agent。项目名暂定。
+[![CI](https://github.com/hedgeho9X/murmur/actions/workflows/ci.yml/badge.svg)](https://github.com/hedgeho9X/murmur/actions/workflows/ci.yml)
+
+面向 Android 的个人记录与思考助手。通过照片、文字和语音记录想法，连接用户自己的 Agent，保留持续的帖子与会话。
+
+**当前处于早期开发阶段：已实现后端与 Kotlin API 模块，Android App/UI、语音和 Hermes 接入尚未实现。**
+
+## 项目结构
 
 | 目录 | 内容 |
 | --- | --- |
-| [Server](Server/README.md) | Hono API、PostgreSQL schema/迁移、S3 存储、Docker Compose、OpenAPI、后端测试及运行配置 |
-| [Client](Client/README.md) | Android 客户端代码；目前包含生成的 Kotlin API 模块与契约测试 |
+| [Server](Server/README.md) | Hono API、PostgreSQL、S3 图片、SQL 迁移、Scalar/OpenAPI 与后端测试 |
+| [Client](Client/README.md) | Kotlin 客户端代码；当前包含生成的 Retrofit API 模块和契约测试 |
 
-后端启动、配置与验证步骤见 [Server/README.md](Server/README.md)。
-运行后打开 [Scalar API 文档](http://127.0.0.1:8787/docs)。
+## 已实现
 
-源码实际位于 `/Users/jerry/code/personal/projects/murmur`。旧目录 `/Users/jerry/Documents/ChatGPT/MyAPP` 为兼容符号链接。
+- 帖子创建、分页读取、详情、改标题与级联删除。
+- 不可变消息：user / assistant / tool 统一模型，content JSONB，turn_id 分组。
+- 首条用户消息与帖子事务创建，幂等重试和删除墓碑。
+- S3 签名上传、真实图片校验、私有读取与可重试清理。
+- OpenAPI → Kotlin 客户端生成，多态 JSON 与真实 HTTP 契约测试。
+
+当前 HTTP 接口只创建首条用户消息；assistant/tool 是已定义并验证的存储契约，不代表已接入 Agent 执行。
+
+## 本地开发
+
+需要 Node.js 22+、Docker；验证 Kotlin 模块还需要 JDK 17。
+
+```sh
+git clone https://github.com/hedgeho9X/murmur.git # 下载仓库
+cd murmur/Server # 后端命令统一在 Server 目录执行
+npm ci # 安装锁定依赖
+cp .env.example .env # 创建本地配置，随后按后端说明设置随机凭据
+```
+
+继续按 [后端启动说明](Server/README.md) 启动 PostgreSQL、RustFS 和 Hono。运行后可打开 [Scalar 文档](http://127.0.0.1:8787/docs)。
+
+默认仅本机可访问。真实 Android 设备访问需要配置可达的 API 和 S3 地址；不要把开发凭据用于公开部署。
+
+## 验证与贡献
+
+接口契约由 Hono/Zod 定义，修改后运行 `npm run codegen`，不要直接修改生成的 Kotlin 主代码。CI 检查后端集成、生成产物一致性和 Kotlin 真实 HTTP 调用。详细设计见 [设计说明](Server/docs/design.md)。
+
+采用 [MIT License](LICENSE)。

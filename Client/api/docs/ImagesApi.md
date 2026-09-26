@@ -15,9 +15,9 @@ All URIs are relative to *http://localhost*
 ### Example
 ```kotlin
 // Import classes:
-//import cn.hedgeho9.myapp.api.*
-//import cn.hedgeho9.myapp.api.infrastructure.*
-//import cn.hedgeho9.myapp.api.models.*
+//import cn.hedgeho9.murmur.api.*
+//import cn.hedgeho9.murmur.api.infrastructure.*
+//import cn.hedgeho9.murmur.api.models.*
 
 val apiClient = ApiClient()
 apiClient.setBearerToken("TOKEN")
@@ -55,9 +55,9 @@ Configure bearerAuth:
 ### Example
 ```kotlin
 // Import classes:
-//import cn.hedgeho9.myapp.api.*
-//import cn.hedgeho9.myapp.api.infrastructure.*
-//import cn.hedgeho9.myapp.api.models.*
+//import cn.hedgeho9.murmur.api.*
+//import cn.hedgeho9.murmur.api.infrastructure.*
+//import cn.hedgeho9.murmur.api.models.*
 
 val apiClient = ApiClient()
 apiClient.setBearerToken("TOKEN")
@@ -97,9 +97,9 @@ Configure bearerAuth:
 ### Example
 ```kotlin
 // Import classes:
-//import cn.hedgeho9.myapp.api.*
-//import cn.hedgeho9.myapp.api.infrastructure.*
-//import cn.hedgeho9.myapp.api.models.*
+//import cn.hedgeho9.murmur.api.*
+//import cn.hedgeho9.murmur.api.infrastructure.*
+//import cn.hedgeho9.murmur.api.models.*
 
 val apiClient = ApiClient()
 apiClient.setBearerToken("TOKEN")

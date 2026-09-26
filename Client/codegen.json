@@ -3,7 +3,7 @@
   "serializationLibrary": "kotlinx_serialization",
   "useCoroutines": true,
   "generateOneOfAnyOfWrappers": true,
-  "packageName": "cn.hedgeho9.myapp.api",
+  "packageName": "cn.hedgeho9.murmur.api",
   "dateLibrary": "string",
   "hideGenerationTimestamp": true,
   "typeMappings": {
@@ -12,5 +12,9 @@
   },
   "importMappings": {
     "JsonElement": "kotlinx.serialization.json.JsonElement"
-  }
+  },
+  "groupId": "cn.hedgeho9.murmur",
+  "artifactId": "murmur-api",
+  "gitUserId": "hedgeho9X",
+  "gitRepoId": "murmur"
 }

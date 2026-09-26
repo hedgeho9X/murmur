@@ -6,6 +6,6 @@
 -keepclasseswithmembers class kotlinx.serialization.json.** { kotlinx.serialization.KSerializer serializer(...); }
 
 # project specific.
--keep,includedescriptorclasses class cn.hedgeho9.myapp.api.models.**$$serializer { *; }
--keepclassmembers class cn.hedgeho9.myapp.api.models.** { *** Companion; }
--keepclasseswithmembers class cn.hedgeho9.myapp.api.models.** { kotlinx.serialization.KSerializer serializer(...); }
+-keep,includedescriptorclasses class cn.hedgeho9.murmur.api.models.**$$serializer { *; }
+-keepclassmembers class cn.hedgeho9.murmur.api.models.** { *** Companion; }
+-keepclasseswithmembers class cn.hedgeho9.murmur.api.models.** { kotlinx.serialization.KSerializer serializer(...); }

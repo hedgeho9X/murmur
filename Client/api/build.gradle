@@ -1,4 +1,4 @@
-group 'org.openapitools'
+group 'cn.hedgeho9.murmur'
 version '1.0.0'
 
 wrapper {
@@ -79,8 +79,8 @@ java {
 publishing {
     publications {
         maven(MavenPublication) {
-            groupId = 'org.openapitools'
-            artifactId = 'kotlin-client'
+            groupId = 'cn.hedgeho9.murmur'
+            artifactId = 'murmur-api'
             version = '1.0.0'
             from components.java
         }

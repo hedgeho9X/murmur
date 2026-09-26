@@ -1,6 +1,6 @@
 # Murmur API
 
-暂定项目名 Murmur，目录 `/Users/jerry/code/personal/projects/murmur`。
+Murmur 的 Hono 后端。
 
 Kotlin / Android 个人记录助手的 Hono 后端。当前提供帖子 CRUD、首条不可变消息、S3 图片及生成客户端。
 
@@ -70,10 +70,6 @@ npm run storage:cleanup # 手动执行一次可重试清理；API 也会每分�
 设置 HOST=0.0.0.0、STORAGE_BIND=0.0.0.0、S3_PUBLIC_ENDPOINT=http://Mac的局域网IP:59000，然后重新创建存储容器并重启 API。Android API 地址为 http://Mac的局域网IP:8787。签名后的 URL 不可再替换主机名。开发 HTTP 需要 Android debug 网络安全配置；正式部署使用 HTTPS。本轮没有真机验收。
 
 设计和限制见 [docs/design.md](docs/design.md)。
-
-## 目录迁移
-
-Docker Compose 项目名 `jerry-myapp`、数据库/bucket 名以及 Kotlin 包名暂时保持稳定，复用已有数据与调用方命名空间。旧目录 `/Users/jerry/Documents/ChatGPT/MyAPP` 仅为指向本目录的兼容符号链接，便于已有 Codex 任务继续工作。
 
 ## 源码入口
 
