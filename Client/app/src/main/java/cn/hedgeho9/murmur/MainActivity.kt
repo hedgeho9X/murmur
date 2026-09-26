@@ -182,7 +182,12 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                             "记录列表",
                         )
                     }
-                    Text("Murmur", fontSize = 24.sp, modifier = Modifier.weight(1f))
+                    Text(
+                        "Murmur",
+                        fontSize = 22.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
+                    )
                     IconButton(onClick = { vm.editor(true) }, enabled = !s.recording) {
                         Icon(Icons.Outlined.Edit, "打开草稿")
                     }
@@ -246,7 +251,8 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                 }
                         }
                         Spacer(Modifier.weight(.5f))
-                        if (s.recording)
+                        if (photoDrag.path != null) Spacer(Modifier.height(76.dp))
+                        else if (s.recording)
                             RoundButton("停止录音", { vm.stop() }) {
                                 Box(
                                     Modifier.size(23.dp)
@@ -255,12 +261,7 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                 )
                             }
                         else if (s.draft.images.isNotEmpty())
-                            Row(
-                                Modifier.graphicsLayer {
-                                    alpha = if (photoDrag.path == null) 1f else 0f
-                                },
-                                horizontalArrangement = Arrangement.spacedBy(36.dp),
-                            ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(64.dp)) {
                                 RoundButton("开始录音", record) {
                                     Box(Modifier.size(26.dp).background(Red, CircleShape))
                                 }
@@ -272,9 +273,11 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                             Box(
                                 Modifier.size(76.dp)
                                     .semantics { contentDescription = "拍照，长按录音" }
-                                    .border(2.dp, Color.DarkGray, CircleShape)
-                                    .padding(7.dp)
-                                    .background(Color.DarkGray, CircleShape)
+                                    .background(Color(0xFFF3F3F3), CircleShape)
+                                    .padding(9.dp)
+                                    .border(1.dp, Color(0xFF252525), CircleShape)
+                                    .padding(5.dp)
+                                    .background(Color(0xFF252525), CircleShape)
                                     .pointerInput(cameraGranted, s.busy) {
                                         detectTapGestures(
                                             onLongPress = { record() },
@@ -318,7 +321,7 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                         )
                                     }
                             )
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(72.dp))
                     }
                 "history" ->
                     LazyColumn(
@@ -332,7 +335,15 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                             OutlinedTextField(
                                 s.query,
                                 vm::query,
-                                placeholder = { Text("搜索记录") },
+                                placeholder = { Text("搜索记录", color = Color(0xFF999999)) },
+                                shape = RoundedCornerShape(12.dp),
+                                colors =
+                                    OutlinedTextFieldDefaults.colors(
+                                        unfocusedBorderColor = Color(0xFFE5E5E5),
+                                        focusedBorderColor = Color(0xFF999999),
+                                        unfocusedContainerColor = Color.White,
+                                        focusedContainerColor = Color.White,
+                                    ),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                                 trailingIcon = {
@@ -345,6 +356,11 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                 TagSuggestions(s.tagSuggestions, vm::searchTag)
                             FilterChip(
                                 selected = s.imagesOnly,
+                                shape = RoundedCornerShape(8.dp),
+                                colors =
+                                    FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFFEAEAEA)
+                                    ),
                                 onClick = { vm.filterImages(!s.imagesOnly) },
                                 label = { Text("有照片") },
                             )
@@ -354,8 +370,9 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                 Modifier.fillMaxWidth()
                                     .clip(RoundedCornerShape(14.dp))
                                     .background(Color.White)
+                                    .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(14.dp))
                                     .clickable { vm.open(post.id.toString()) }
-                                    .padding(16.dp)
+                                    .padding(14.dp)
                             ) {
                                 Text(
                                     java.time.Instant.parse(post.createdAt)
@@ -391,7 +408,14 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                                 )
                             if (s.cursor != null)
                                 TextButton(onClick = { vm.history(true) }) { Text("加载更多") }
-                            FilledTonalButton(onClick = { vm.capture() }) { Text("＋") }
+                            Button(
+                                onClick = { vm.capture() },
+                                shape = RoundedCornerShape(12.dp),
+                                colors =
+                                    ButtonDefaults.buttonColors(containerColor = Color(0xFF242424)),
+                            ) {
+                                Text("＋", fontSize = 24.sp)
+                            }
                         }
                     }
                 "detail" ->
@@ -441,7 +465,14 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                             IconButton(onClick = { confirmDelete = true }) {
                                 Icon(Icons.Outlined.Delete, "删除帖子")
                             }
-                            FilledTonalButton(onClick = { vm.reply() }) { Text("补充记录") }
+                            Button(
+                                onClick = { vm.reply() },
+                                shape = RoundedCornerShape(12.dp),
+                                colors =
+                                    ButtonDefaults.buttonColors(containerColor = Color(0xFF242424)),
+                            ) {
+                                Text("补充记录")
+                            }
                         }
                     }
             }
@@ -701,10 +732,13 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
 /** 圆形主操作按钮，保留足够触摸区域及可访问语义。 */
 @Composable
 private fun RoundButton(label: String, click: () -> Unit, content: @Composable () -> Unit) {
-    OutlinedIconButton(
-        onClick = click,
-        modifier = Modifier.size(68.dp).semantics { contentDescription = label },
-        shape = CircleShape,
+    Box(
+        Modifier.size(76.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0xFFF3F3F3))
+            .clickable(onClick = click)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
     ) {
         content()
     }
