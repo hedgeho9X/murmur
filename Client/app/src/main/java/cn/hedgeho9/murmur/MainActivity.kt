@@ -645,6 +645,7 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
         if (settings) {
             var url by remember { mutableStateOf(s.base) }
             var token by remember { mutableStateOf(s.token) }
+            var directAsr by remember { mutableStateOf(s.directAsr) }
             var probing by remember { mutableStateOf(false) }
             var probeResult by remember(url, token) { mutableStateOf<String?>(null) }
             AlertDialog(
@@ -693,12 +694,17 @@ fun MurmurScreen(vm: MurmurModel = viewModel()) {
                             Text(if (probing) "正在测试…" else "测试连接与延迟")
                         }
                         probeResult?.let { Text(it, fontSize = 13.sp) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("语音直连", modifier = Modifier.weight(1f))
+                            Switch(checked = directAsr, onCheckedChange = { directAsr = it })
+                        }
+                        Text(if (directAsr) "短期凭证 · 手机直连语音服务" else "由服务器转发语音", fontSize = 12.sp)
                     }
                 },
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            vm.settings(url, token)
+                            vm.settings(url, token, directAsr)
                             settings = false
                         }
                     ) {

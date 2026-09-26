@@ -1,4 +1,4 @@
-/** Android PCM 采集与 Hono WebSocket 客户端；仅使用业务令牌，不接触 Qwen 密钥。 */
+/** Android PCM 采集与语音链路管理；支持服务器转发和短期凭据直连，不接触永久密钥。 */
 package cn.hedgeho9.murmur
 
 import android.annotation.SuppressLint
@@ -10,6 +10,7 @@ import cn.hedgeho9.murmur.api.infrastructure.Serializer
 import cn.hedgeho9.murmur.api.models.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.sqrt
+import kotlinx.coroutines.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import okhttp3.*
@@ -31,6 +32,7 @@ class TranscriptAssembler {
 class SpeechRecorder(
     private val base: String,
     private val token: String,
+    private val direct: Boolean = false,
     private val onText: (String) -> Unit,
     private val onLevel: (Float) -> Unit,
     private val onComplete: () -> Unit,
@@ -46,6 +48,8 @@ class SpeechRecorder(
                 .build()
     }
 
+    private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var vendor: QwenSpeechProtocol? = null
     private val client = sharedClient
     private val assembler = TranscriptAssembler()
     private var ws: WebSocket? = null
@@ -53,7 +57,7 @@ class SpeechRecorder(
     private var thread: Thread? = null
     @Volatile private var recording = false
     private var ready = false
-    private var stopped = false
+    @Volatile private var stopped = false
     @Volatile private var done = false
     private val pending = ArrayDeque<ByteArray>()
     private var queued = 0
@@ -79,91 +83,6 @@ class SpeechRecorder(
             check(recorder.state == AudioRecord.STATE_INITIALIZED) { "无法初始化麦克风" }
             audio = recorder
             recording = true
-            val url =
-                base
-                    .trimEnd('/')
-                    .replaceFirst("https://", "wss://")
-                    .replaceFirst("http://", "ws://") + ApiPaths.STREAM_ASR
-            ws =
-                client.newWebSocket(
-                    Request.Builder().url(url).header("Authorization", "Bearer $token").build(),
-                    object : WebSocketListener() {
-                        override fun onOpen(webSocket: WebSocket, response: Response) {
-                            webSocket.send(
-                                Serializer.kotlinxSerializationJson.encodeToString(
-                                    AsrStart(
-                                        AsrStart.Type.start,
-                                        AsrStart.Format.pcm_s16le,
-                                        16000,
-                                        1,
-                                    )
-                                )
-                            )
-                        }
-
-                        override fun onMessage(webSocket: WebSocket, text: String) {
-                            try {
-                                val e =
-                                    Serializer.kotlinxSerializationJson.decodeFromString<
-                                        AsrServerEvent
-                                    >(
-                                        text
-                                    )
-                                when (e) {
-                                    is AsrServerEvent.ReadyWrapper ->
-                                        synchronized(this@SpeechRecorder) {
-                                            ready = true
-                                            while (pending.isNotEmpty()) {
-                                                if (
-                                                    !webSocket.send(
-                                                        pending.removeFirst().toByteString()
-                                                    )
-                                                )
-                                                    throw IllegalStateException("连接已关闭")
-                                            }
-                                            queued = 0
-                                            if (stopped)
-                                                webSocket.send(
-                                                    Serializer.kotlinxSerializationJson
-                                                        .encodeToString(
-                                                            AsrFinish(AsrFinish.Type.finish)
-                                                        )
-                                                )
-                                        }
-                                    is AsrServerEvent.TranscriptWrapper ->
-                                        onText(
-                                            assembler.accept(
-                                                e.value.segmentId,
-                                                e.value.text,
-                                                e.value.isFinal,
-                                            )
-                                        )
-                                    is AsrServerEvent.CompletedWrapper -> {
-                                        done = true
-                                        onText(e.value.text)
-                                        onComplete()
-                                        webSocket.close(1000, "done")
-                                    }
-                                    is AsrServerEvent.ErrorWrapper -> fail("识别失败：${e.value.code}")
-                                }
-                            } catch (_: Exception) {
-                                fail("识别结果格式错误")
-                            }
-                        }
-
-                        override fun onFailure(
-                            webSocket: WebSocket,
-                            t: Throwable,
-                            response: Response?,
-                        ) {
-                            if (!done) fail("语音连接失败${response?.let{"（${it.code}）"}?:""}，已保留文字")
-                        }
-
-                        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                            if (!done) fail("识别连接提前结束，已保留文字")
-                        }
-                    },
-                )
             recorder.startRecording()
             thread =
                 Thread(
@@ -207,22 +126,145 @@ class SpeechRecorder(
                                 synchronized(this) {
                                     audio = null
                                     stopped = true
-                                    if (ready && !done)
-                                        ws?.send(
-                                            Serializer.kotlinxSerializationJson.encodeToString(
-                                                AsrFinish(AsrFinish.Type.finish)
-                                            )
-                                        )
+                                    if (ready && !done) ws?.send(finishControl())
                                 }
                             }
                         },
                         "murmur-audio",
                     )
                     .also { it.start() }
+            sessionScope.launch {
+                try {
+                    connect()
+                } catch (_: CancellationException) {
+                    if (!done) fail("获取语音凭据超时，请重试")
+                } catch (e: Exception) {
+                    fail("语音连接失败：${syncError(e)}")
+                }
+            }
+            sessionScope.launch {
+                delay(600000)
+                fail("录音已达十分钟，已保留文字")
+            }
         } catch (_: Exception) {
             fail("麦克风启动失败")
         }
     }
+
+    /** 获取临时凭据并建立当前会话；等待期间采集线程仍缓存起始音频。 */
+    private suspend fun connect() {
+        val credential =
+            if (direct) withTimeout(10000) { MurmurApi(base, token).asrCredentials() } else null
+        if (credential != null) {
+            require(credential.expiresAt.toLong() > System.currentTimeMillis() / 1000 + 30)
+            val uri = java.net.URI(credential.endpoint)
+            require(uri.scheme == "wss" && uri.host.endsWith(".aliyuncs.com"))
+            vendor = QwenSpeechProtocol(credential.model)
+        }
+        val url =
+            credential?.endpoint
+                ?: base
+                    .trimEnd('/')
+                    .replaceFirst("https://", "wss://")
+                    .replaceFirst("http://", "ws://") + ApiPaths.STREAM_ASR
+        synchronized(this@SpeechRecorder) {
+            if (done) return
+            ws =
+                client.newWebSocket(
+                    Request.Builder()
+                        .url(url)
+                        .header("Authorization", "Bearer ${credential?.token ?: token}")
+                        .build(),
+                    object : WebSocketListener() {
+                        override fun onOpen(webSocket: WebSocket, response: Response) {
+                            synchronized(this@SpeechRecorder) {
+                                if (done) {
+                                    webSocket.cancel()
+                                    return
+                                }
+                                webSocket.send(startControl())
+                            }
+                        }
+
+                        override fun onMessage(webSocket: WebSocket, text: String) {
+                            try {
+                                if (done) return
+                                val e =
+                                    if (direct) vendor?.decode(text) ?: return
+                                    else
+                                        Serializer.kotlinxSerializationJson.decodeFromString<
+                                            AsrServerEvent
+                                        >(
+                                            text
+                                        )
+                                when (e) {
+                                    is AsrServerEvent.ReadyWrapper ->
+                                        synchronized(this@SpeechRecorder) {
+                                            ready = true
+                                            while (pending.isNotEmpty()) {
+                                                if (
+                                                    !webSocket.send(
+                                                        pending.removeFirst().toByteString()
+                                                    )
+                                                )
+                                                    throw IllegalStateException("连接已关闭")
+                                            }
+                                            queued = 0
+                                            if (stopped) webSocket.send(finishControl())
+                                        }
+                                    is AsrServerEvent.TranscriptWrapper ->
+                                        onText(
+                                            assembler.accept(
+                                                e.value.segmentId,
+                                                e.value.text,
+                                                e.value.isFinal,
+                                            )
+                                        )
+                                    is AsrServerEvent.CompletedWrapper -> {
+                                        if (!stopped) {
+                                            fail("识别连接提前结束，已保留文字")
+                                            return
+                                        }
+                                        done = true
+                                        sessionScope.cancel()
+                                        onText(e.value.text)
+                                        onComplete()
+                                        webSocket.close(1000, "done")
+                                    }
+                                    is AsrServerEvent.ErrorWrapper -> fail("识别失败：${e.value.code}")
+                                }
+                            } catch (_: Exception) {
+                                fail("识别结果格式错误")
+                            }
+                        }
+
+                        override fun onFailure(
+                            webSocket: WebSocket,
+                            t: Throwable,
+                            response: Response?,
+                        ) {
+                            if (!done) fail("语音连接失败${response?.let{"（${it.code}）"}?:""}，已保留文字")
+                        }
+
+                        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                            if (!done) fail("识别连接提前结束，已保留文字")
+                        }
+                    },
+                )
+        }
+    }
+
+    /** 根据链路选择开始控制帧；业务事件来自生成模型。 */
+    private fun startControl(): String =
+        vendor?.control(true)
+            ?: Serializer.kotlinxSerializationJson.encodeToString(
+                AsrStart(AsrStart.Type.start, AsrStart.Format.pcm_s16le, 16000, 1)
+            )
+
+    /** 根据链路选择结束控制帧，保留连接等待最终结果。 */
+    private fun finishControl(): String =
+        vendor?.control(false)
+            ?: Serializer.kotlinxSerializationJson.encodeToString(AsrFinish(AsrFinish.Type.finish))
 
     /** 顺序发送音频并限制网络积压，不在网络异常时静默丢帧。 */
     @Synchronized
@@ -253,6 +295,7 @@ class SpeechRecorder(
     @Synchronized
     fun cancel() {
         done = true
+        sessionScope.cancel()
         recording = false
         try {
             audio?.stop()

@@ -32,3 +32,13 @@
 ## 原生实现
 
 `SpeechRecorder.kt` 通过 AudioRecord 采集 16 kHz PCM16，使用生成的 AsrStart/AsrFinish/AsrServerEvent 及 ApiPaths.STREAM_ASR 接入后端。只缓存有上限的起始音频；ready 后按序转发，停止后等待 completed。画面静音取决于本地音量，不能根据是否收到 partial 判断。
+
+## 可选短期凭据直连
+
+连接设置提供“语音直连”开关，默认关闭。开启后先通过生成的 `ASRApi.createAsrCredentials` 申请十五分钟凭据，再由手机连接供应商 WSS；永久 Key 始终留在服务器。关闭时继续走 `/api/v1/asr/stream` 转发。
+
+临时凭据仅用于当前录音，不写入 SharedPreferences、SQLite 或日志。等待凭据时麦克风已经开始采集，起始缓冲上限十秒；单次录音最多十分钟，停止后仍等待最终结果。失败会显式提示，不静默切换链路。
+
+`QwenSpeechProtocol` 是外部供应商 WebSocket 适配器，将事件归一为生成的 `AsrServerEvent`，业务 REST 路径与 DTO 继续由 OpenAPI 生成。
+
+2026-09-27 在 Mac 用临时凭据直连新加坡服务发送 5.45 秒合成音频，连接开始到首次文字 1325ms、停止到完成 604ms。该结果只验证短期凭据和协议可用，尚不能代表手机 VPN 网络下的延迟。

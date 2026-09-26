@@ -95,6 +95,14 @@ class DraftStore(private val context: Context) {
     /** 返回固定连接地址，初始值用于 adb reverse 的本地开发链路。 */
     fun baseUrl(): String = prefs.getString("url", BuildConfig.DEFAULT_API_URL)!!
 
+    /** 返回用户选择的语音链路，默认由服务器转发。 */
+    fun directAsr(): Boolean = prefs.getBoolean("direct_asr", false)
+
+    /** 保存语音链路选择，不持久化供应商临时凭据。 */
+    fun configureAsr(direct: Boolean) {
+        check(prefs.edit().putBoolean("direct_asr", direct).commit())
+    }
+
     /** 通过 Keystore 解密 API 令牌；密钥丢失时要求用户重新配置。 */
     fun token(): String {
         val stored = prefs.getString("token", null) ?: return ""

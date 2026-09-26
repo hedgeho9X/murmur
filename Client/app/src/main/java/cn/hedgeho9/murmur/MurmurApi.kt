@@ -1,6 +1,7 @@
 /** 使用生成客户端访问帖子和图片接口；不在 UI 中维护第二份 HTTP 契约。 */
 package cn.hedgeho9.murmur
 
+import cn.hedgeho9.murmur.api.apis.ASRApi
 import cn.hedgeho9.murmur.api.apis.ImagesApi
 import cn.hedgeho9.murmur.api.apis.PostsApi
 import cn.hedgeho9.murmur.api.infrastructure.ApiClient
@@ -73,6 +74,10 @@ class MurmurApi(base: String, token: String) {
         }
         return body() ?: throw IllegalStateException("服务器返回空内容")
     }
+
+    /** 通过生成接口申请一次录音的短期凭据，仅交给当前录音会话。 */
+    suspend fun asrCredentials(): AsrCredentials =
+        client.createService(ASRApi::class.java).createAsrCredentials().value()
 
     /** 上传图片并完成校验，返回资源 ID；字节上传不携带业务 API 的认证令牌。 */
     suspend fun upload(path: String): String =

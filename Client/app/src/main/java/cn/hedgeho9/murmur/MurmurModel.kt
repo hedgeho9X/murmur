@@ -46,6 +46,7 @@ data class UiState(
     val error: String? = null,
     val base: String = "",
     val token: String = "",
+    val directAsr: Boolean = false,
 )
 
 /** 单用户应用状态，网络任务在协程中执行，失败保留原始草稿。 */
@@ -53,7 +54,10 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
     private val store = DraftStore(application)
     private val database = NotesDatabase.get(application)
     private var localLimit = 40
-    private val mutable = MutableStateFlow(UiState(base = store.baseUrl(), token = store.token()))
+    private val mutable =
+        MutableStateFlow(
+            UiState(base = store.baseUrl(), token = store.token(), directAsr = store.directAsr())
+        )
     val state = mutable.asStateFlow()
     private val errorQueue = ArrayDeque<String>()
     private val reportedSyncErrors = mutableSetOf<String>()
@@ -210,10 +214,11 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** 保存连接配置并更新 API 调用入口。 */
-    fun settings(url: String, token: String) {
+    fun settings(url: String, token: String, directAsr: Boolean) {
         try {
             val changedServer = state.value.base.trimEnd('/') != url.trimEnd('/')
             store.configure(url, token)
+            store.configureAsr(directAsr)
             if (changedServer) draft(state.value.draft.copy(postId = null, uploads = emptyMap()))
             detailJob?.cancel()
             tagJob?.cancel()
@@ -221,6 +226,7 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
                 it.copy(
                     base = store.baseUrl(),
                     token = token,
+                    directAsr = directAsr,
                     posts = emptyList(),
                     details = emptyList(),
                     cursor = null,
@@ -422,6 +428,7 @@ class MurmurModel(application: Application) : AndroidViewModel(application) {
             SpeechRecorder(
                     state.value.base,
                     state.value.token,
+                    direct = state.value.directAsr,
                     onText = { text ->
                         viewModelScope.launch {
                             draft(
