@@ -106,6 +106,10 @@ const deletePostRoute = createRoute({
  * 注册本身不执行查询；收到请求后才调用服务并返回约定的 HTTP 响应。
  */
 export function registerPostsApi(app: OpenAPIHono, service: PostsService) {
+  /**
+   * POST /api/v1/posts
+   * 创建帖子及首条用户消息，返回幂等创建结果。
+   */
   app.openapi(createPostRoute, async (c) =>
     c.json(
       C.CreatedPost.parse(
@@ -117,16 +121,28 @@ export function registerPostsApi(app: OpenAPIHono, service: PostsService) {
       201,
     ),
   );
+  /**
+   * GET /api/v1/posts
+   * 按游标分页读取帖子列表。
+   */
   app.openapi(listPostsRoute, async (c) => {
     const q = c.req.valid("query");
     return c.json(await service.list(q.limit, q.cursor), 200);
   });
+  /**
+   * GET /api/v1/posts/{id}
+   * 读取帖子及其按顺序排列的消息。
+   */
   app.openapi(getPostRoute, async (c) =>
     c.json(
       C.PostDetail.parse(await service.detail(c.req.valid("param").id)),
       200,
     ),
   );
+  /**
+   * PATCH /api/v1/posts/{id}
+   * 修改帖子标题，不修改已发送消息。
+   */
   app.openapi(renamePostRoute, async (c) =>
     c.json(
       C.Post.parse(
@@ -138,6 +154,10 @@ export function registerPostsApi(app: OpenAPIHono, service: PostsService) {
       200,
     ),
   );
+  /**
+   * DELETE /api/v1/posts/{id}
+   * 级联删除帖子所属数据，并登记对象清理任务。
+   */
   app.openapi(deletePostRoute, async (c) => {
     await service.delete(c.req.valid("param").id);
     return c.body(null, 204);

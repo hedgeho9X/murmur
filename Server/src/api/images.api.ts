@@ -57,6 +57,10 @@ const getImageUrlRoute = createRoute({
  * 注册不产生存储操作，签名地址和上传校验结果在请求处理时生成。
  */
 export function registerImagesApi(app: OpenAPIHono, service: ImagesService) {
+  /**
+   * POST /api/v1/images/uploads
+   * 申请图片记录及临时上传签名地址。
+   */
   app.openapi(createImageUploadRoute, async (c) =>
     c.json(
       await service.createUpload(
@@ -66,9 +70,17 @@ export function registerImagesApi(app: OpenAPIHono, service: ImagesService) {
       201,
     ),
   );
+  /**
+   * POST /api/v1/images/{id}/complete
+   * 校验已上传图片并返回发布后的元数据。
+   */
   app.openapi(completeImageUploadRoute, async (c) =>
     c.json(await service.complete(c.req.valid("param").id), 200),
   );
+  /**
+   * GET /api/v1/images/{id}/url
+   * 为已就绪图片生成短期读取地址。
+   */
   app.openapi(getImageUrlRoute, async (c) =>
     c.json(await service.readUrl(c.req.valid("param").id), 200),
   );
